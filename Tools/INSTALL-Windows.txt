@@ -1,0 +1,25 @@
+Prism FX, by Prismatic
+======================
+
+A VST3 effect for Windows (64-bit), built from the CHOMPI effects and tape
+looper.
+
+Install
+-------
+1. Before unzipping, right-click the downloaded zip, choose Properties, tick
+   "Unblock" at the bottom, and click OK. (Windows marks downloaded files, and
+   some DAWs won't load plug-ins that still carry that mark.)
+
+2. Unzip it, and copy the "Prism FX.vst3" folder to:
+      C:\Program Files\Common Files\VST3\
+   Windows will ask for permission to copy there.
+
+3. Restart your DAW, or rescan plug-ins.
+   - Ableton Live: Options > Preferences > Plug-Ins, turn on "Use VST3 Plug-In
+     System Folders", then click Rescan.
+   - Others (Reaper, FL Studio, Bitwig, Cubase...): rescan VST3 plug-ins.
+
+Prism FX shows up under the manufacturer "Prismatic".
+
+Prism FX is free and open source (GNU AGPLv3); see the Licenses folder.
+Source code and docs: REPO_URL

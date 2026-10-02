@@ -1,0 +1,58 @@
+# Builds Prism FX for macOS (AU + VST3, Apple Silicon and Intel) and Windows (VST3, 64-bit).
+# Every push builds both and keeps the zips as workflow artifacts for a few days.
+# Pushing a tag like v0.2.0 also attaches both zips to that GitHub release (creating it if needed).
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and package
+        run: ./Tools/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Prism-FX-macOS
+          path: dist/Prism-FX-macOS.zip
+          retention-days: 7
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and package
+        shell: pwsh
+        run: ./Tools/package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Prism-FX-Windows
+          path: dist/Prism-FX-Windows.zip
+          retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Prism FX ${TAG#v}" --generate-notes
+          gh release upload "$TAG" dist/Prism-FX-macOS.zip dist/Prism-FX-Windows.zip --repo "$GITHUB_REPOSITORY" --clobber

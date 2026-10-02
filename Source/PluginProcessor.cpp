@@ -384,7 +384,7 @@ void PrismProcessor::setStateInformation(const void* data, int sizeInBytes)
     if(flacSize <= 0 || flacSize > in.getNumBytesRemaining())
         return;
     juce::MemoryBlock flac;
-    in.readIntoMemoryBlock(flac, static_cast<ssize_t>(flacSize));
+    in.readIntoMemoryBlock(flac, static_cast<juce::pointer_sized_int>(flacSize));
 
     juce::FlacAudioFormat format;
     std::unique_ptr<juce::AudioFormatReader> reader(

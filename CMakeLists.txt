@@ -22,13 +22,20 @@ FetchContent_MakeAvailable(JUCE)
 # Copy the built AU / VST3 into ~/Library/Audio/Plug-Ins so Logic and Ableton find them.
 option(PRISM_INSTALL_PLUGINS "Copy plug-ins to the user plug-in folders after building" ON)
 
+# AU is Apple-only; Windows and Linux get VST3 (and the standalone app)
+if(APPLE)
+    set(PRISM_FORMATS AU VST3 Standalone)
+else()
+    set(PRISM_FORMATS VST3 Standalone)
+endif()
+
 juce_add_plugin(PrismFX
     PRODUCT_NAME             "${PLUGIN_NAME}"
     COMPANY_NAME             "Prismatic"
     BUNDLE_ID                "com.prismatic.prismfx"
     PLUGIN_MANUFACTURER_CODE Prsm
     PLUGIN_CODE              Pfx1
-    FORMATS                  AU VST3 Standalone
+    FORMATS                  ${PRISM_FORMATS}
     IS_SYNTH                 FALSE
     NEEDS_MIDI_INPUT         FALSE
     NEEDS_MIDI_OUTPUT        FALSE
