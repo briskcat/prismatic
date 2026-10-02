@@ -11,8 +11,8 @@ one-knob macros are split out into separate controls.
 
 ## Download and install (macOS)
 
-Download `Prism-FX-<version>-macOS.zip` from the releases page, unzip it, and
-follow `INSTALL.txt`:
+Download it from the [Prism FX page](https://briskcat.github.io/prismatic/) or
+the releases page (`Prism-FX-macOS.zip`), unzip it, and follow `INSTALL.txt`:
 1. Copy `Prism FX.component` to `~/Library/Audio/Plug-Ins/Components/` and
    `Prism FX.vst3` to `~/Library/Audio/Plug-Ins/VST3/`.
 2. The plug-ins aren't notarized, so macOS may block them the first time. Run
@@ -26,7 +26,7 @@ follow `INSTALL.txt`:
 It runs on Apple Silicon and Intel Macs.
 
 To make the zip yourself, run `./Tools/package.sh`. It builds for both chips,
-signs the plug-ins ad hoc, and writes `dist/Prism-FX-<version>-macOS.zip`.
+signs the plug-ins ad hoc, and writes `dist/Prism-FX-macOS.zip`.
 
 
 

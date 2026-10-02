@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds Prism FX for Apple Silicon and Intel and packages the AU and VST3 into a zip for sharing.
-#   ./Tools/package.sh            -> dist/Prism-FX-<version>-macOS.zip
+#   ./Tools/package.sh            -> dist/Prism-FX-macOS.zip
 # The plug-ins are signed ad hoc (no Apple Developer ID), so people opening them for the first
 # time need the step in INSTALL.txt.
 set -euo pipefail
@@ -33,6 +33,6 @@ cp LICENSE "$stage/Licenses/LICENSE (AGPLv3).txt"
 cp NOTICE.md TRADEMARKS.md "$stage/Licenses/"
 cp Assets/fonts/OFL-*.txt "$stage/Licenses/"
 
-zip_name="Prism-FX-$version-macOS.zip"
+zip_name="Prism-FX-macOS.zip" # the same name every release, so "latest" download links keep working
 (cd dist && rm -f "$zip_name" && ditto -c -k --norsrc --noextattr --keepParent "Prism FX $version" "$zip_name")
 echo "dist/$zip_name"

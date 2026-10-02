@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prism FX</title>
+<meta name="description" content="Prism FX: a free, open-source effect and tape looper plug-in (AU / VST3) built from the CHOMPI effects.">
+<meta property="og:title" content="Prism FX, by Prismatic">
+<meta property="og:description" content="A free, open-source effect and tape looper plug-in for Ableton, Logic and other DAWs.">
+<meta property="og:image" content="screenshot-night.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #161616; --ink: #ECE8DE; --muted: #8F8A80; --accent: #D6F35C; --on-accent: #161616; --red: #FF7354; --track: #3a3833;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="night"]) { --bg: #F2F0E8; --ink: #1B1A18; --muted: #6F6B62; --accent: #3A62EA; --on-accent: #F2F0E8; --red: #D23A28; --track: #d6d2c6; }
+}
+:root[data-theme="cream"] { --bg: #F2F0E8; --ink: #1B1A18; --muted: #6F6B62; --accent: #3A62EA; --on-accent: #F2F0E8; --red: #D23A28; --track: #d6d2c6; }
+:root[data-theme="night"] { --bg: #161616; --ink: #ECE8DE; --muted: #8F8A80; --accent: #D6F35C; --on-accent: #161616; --red: #FF7354; --track: #3a3833; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'DM Mono', ui-monospace, monospace; font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+a { color: inherit; }
+.serif { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+.caps { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.rule { border: 0; border-top: 1px solid var(--ink); margin: 0; }
+
+/* top bar */
+.bar { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 14px 0 10px; }
+.bar .status { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--muted); font-size: 19px; }
+.theme { display: flex; gap: 14px; }
+.theme button { all: unset; cursor: pointer; font-family: 'Instrument Serif', serif; font-size: 19px; color: var(--muted); }
+.theme button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 40px; align-items: end; padding: 28px 0 26px; }
+h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: clamp(64px, 11vw, 120px); line-height: .9; letter-spacing: -.02em; margin: 0; position: relative; }
+h1 .m { position: relative; }
+h1 .m::before { content: ""; position: absolute; left: 50%; top: -.06em; width: .2em; height: .2em; transform: translateX(-50%);
+  background: var(--ink); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.by { margin-top: 10px; }
+.lede { font-family: 'Instrument Serif', serif; font-size: clamp(22px, 2.6vw, 28px); line-height: 1.25; max-width: 30ch; margin: 18px 0 0; }
+.cta { display: flex; flex-direction: column; gap: 10px; align-items: stretch; min-width: 270px; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 999px; padding: 12px 22px; text-decoration: none;
+  font-weight: 500; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid var(--ink); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn[aria-disabled="true"] { opacity: .45; cursor: default; }
+.cta .note { font-family: 'Instrument Serif', serif; font-style: italic; color: var(--muted); font-size: 16px; text-align: center; }
+
+/* screenshot */
+.shot { margin: 0; padding: 26px 0 30px; }
+.shot img { display: block; width: 100%; height: auto; border: 1px solid var(--track); border-radius: 6px; }
+.shot .cream { display: none; }
+:root[data-shot="cream"] .shot .night { display: none; }
+:root[data-shot="cream"] .shot .cream { display: block; }
+
+/* sections */
+section { padding: 30px 0 34px; }
+.head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+.head .num { color: var(--muted); font-size: 12px; }
+h2 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 38px; line-height: 1; margin: 0; }
+
+/* install */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.steps li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px; }
+.steps .n { color: var(--muted); font-size: 12px; padding-top: 5px; }
+.steps p { margin: 0; font-family: 'Instrument Serif', serif; font-size: 22px; line-height: 1.3; }
+.steps code { font-family: 'DM Mono', monospace; font-size: 14px; }
+.path { display: inline-block; border-bottom: 1px solid var(--track); }
+.cmd { margin-top: 10px; display: flex; align-items: stretch; border: 1px solid var(--ink); border-radius: 6px; overflow: hidden; }
+.cmd pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; flex: 1; white-space: pre-wrap; word-break: break-all; }
+.cmd button { all: unset; cursor: pointer; padding: 0 16px; border-left: 1px solid var(--ink); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; }
+.cmd button:hover { background: var(--accent); color: var(--on-accent); }
+.aside { margin-top: 8px; color: var(--muted); font-family: 'Instrument Serif', serif; font-style: italic; font-size: 17px; }
+
+/* modules */
+.mods { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); border-top: 1px solid var(--ink); }
+.mod { padding: 16px 18px 18px 0; border-bottom: 1px solid var(--track); }
+.mod .t { display: flex; align-items: baseline; gap: 10px; }
+.mod .t .num { color: var(--muted); font-size: 11px; }
+.mod h3 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; }
+.mod p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+/* footer */
+footer { padding: 26px 0 40px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; color: var(--muted); font-size: 13px; }
+footer a { color: var(--ink); }
+
+@media (max-width: 760px) {
+  .wrap { padding: 0 16px; }
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .cta { min-width: 0; }
+  .bar .status { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <span class="caps">Free · open source · macOS</span>
+    <span class="status">v0.1.0 · AU and VST3</span>
+    <div class="theme" role="group" aria-label="Theme">
+      <button type="button" data-set="night">Night</button>
+      <button type="button" data-set="cream">Cream</button>
+    </div>
+  </div>
+  <hr class="rule">
+
+  <div class="hero">
+    <div>
+      <h1>Pris<span class="m">m</span> FX</h1>
+      <div class="by caps">by Prismatic</div>
+      <p class="lede">A free effect and tape looper for Ableton, Logic and other DAWs, built from the CHOMPI effects.</p>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/briskcat/prismatic/releases/latest/download/Prism-FX-macOS.zip">Download for Mac</a>
+      <span class="btn" aria-disabled="true" title="Windows is on the way">Windows: coming soon</span>
+      <span class="note">Apple Silicon and Intel · AU and VST3</span>
+    </div>
+  </div>
+  <hr class="rule">
+
+  <figure class="shot">
+    <img class="night" src="screenshot-night.png" alt="The Prism FX window in the Night theme: a chain of effect modules across the top and the glitch delay and tape looper below." width="2640" height="1096">
+    <img class="cream" src="screenshot-cream.png" alt="The Prism FX window in the Cream theme." width="2640" height="1096" loading="lazy">
+  </figure>
+  <hr class="rule">
+
+  <section id="install">
+    <div class="head"><span class="num">01</span><h2>Install</h2></div>
+    <ol class="steps">
+      <li><span class="n">1</span><div><p>Unzip the download. Copy <code class="path">Prism FX.component</code> to <code class="path">~/Library/Audio/Plug-Ins/Components</code> and <code class="path">Prism FX.vst3</code> to <code class="path">~/Library/Audio/Plug-Ins/VST3</code>.</p>
+        <div class="aside">In Finder, press Shift-Cmd-G and paste the folder path to get there.</div></div></li>
+      <li><span class="n">2</span><div><p>Prism FX isn't notarized by Apple yet, so macOS will say it "could not verify" it. Click Done, then run this in Terminal to allow it:</p>
+        <div class="cmd"><pre id="cmd">xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Prism FX.component" ~/Library/Audio/Plug-Ins/VST3/"Prism FX.vst3"</pre><button type="button" id="copy">Copy</button></div></div></li>
+      <li><span class="n">3</span><div><p>Restart your DAW. Prism FX is listed under <em>Prismatic</em>.</p>
+        <div class="aside">Logic: if it doesn't appear, open Plug-in Manager and rescan. Ableton: Settings › Plug-Ins › Rescan.</div></div></li>
+    </ol>
+  </section>
+  <hr class="rule">
+
+  <section id="inside">
+    <div class="head"><span class="num">02</span><h2>What's inside</h2></div>
+    <div class="mods">
+      <div class="mod"><div class="t"><span class="num">01</span><h3>filter</h3></div><p>One knob: low-pass one way, high-pass the other, with resonance.</p></div>
+      <div class="mod"><div class="t"><span class="num">02</span><h3>drive</h3></div><p>Soft clipping with loudness compensation.</p></div>
+      <div class="mod"><div class="t"><span class="num">03</span><h3>tape</h3></div><p>Wow and flutter, with depth and rate.</p></div>
+      <div class="mod"><div class="t"><span class="num">04</span><h3>crush</h3></div><p>Sample-rate and bit reduction.</p></div>
+      <div class="mod"><div class="t"><span class="num">05</span><h3>delay</h3></div><p>A varispeed tape delay: change the time and the repeats re-pitch.</p></div>
+      <div class="mod"><div class="t"><span class="num">06</span><h3>glitch delay</h3></div><p>Tempo-synced retriggers, reverses and octaves, with repeatable patterns.</p></div>
+      <div class="mod"><div class="t"><span class="num">07</span><h3>reverb</h3></div><p>A plate reverb with freeze.</p></div>
+      <div class="mod"><div class="t"><span class="num">08</span><h3>tape looper</h3></div><p>Varispeed, reverse and overdub. The loop window can slide and wander around the tape, and you can drag the loop into your DAW.</p></div>
+    </div>
+    <p class="aside" style="margin-top:16px">Drag the effects into any order. Two themes, and a window you can resize.</p>
+  </section>
+  <hr class="rule">
+
+  <footer>
+    <span>Free and open source under the GNU AGPLv3. <a href="https://github.com/briskcat/prismatic">Source code and docs on GitHub</a>.</span>
+    <span>An independent project, not made or endorsed by CHOMPI Club or Chase Bliss.</span>
+  </footer>
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  function stored() { try { return localStorage.getItem('prism-theme'); } catch (e) { return null; } }
+  function apply(theme) {
+    var dark = theme ? theme === 'night' : !window.matchMedia('(prefers-color-scheme: light)').matches;
+    if (theme) root.setAttribute('data-theme', theme); else root.removeAttribute('data-theme');
+    root.setAttribute('data-shot', dark ? 'night' : 'cream');
+    document.querySelectorAll('.theme button').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.set === (dark ? 'night' : 'cream')));
+    });
+  }
+  apply(stored());
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () { apply(stored()); });
+  document.querySelectorAll('.theme button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      try { localStorage.setItem('prism-theme', b.dataset.set); } catch (e) {}
+      apply(b.dataset.set);
+    });
+  });
+  var copy = document.getElementById('copy');
+  copy.addEventListener('click', function () {
+    var text = document.getElementById('cmd').textContent;
+    var done = function () { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+  });
+})();
+</script>
+</body>
+</html>
