@@ -73,7 +73,7 @@ class FxEngine
 
     void Clear()
     {
-        std::fill(&buffer_[0], &buffer_[size], 0);
+        std::fill(&buffer_[0], &buffer_[size], T(0));
         write_ptr_ = 0;
     }
 
