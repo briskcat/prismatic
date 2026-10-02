@@ -8,7 +8,26 @@ An AU / VST3 effect plug-in built from the CHOMPI firmware's effects and tape
 looper. Every control is a knob or button: the hardware's shift functions and
 one-knob macros are split out into separate controls.
 
-## Effects
+## Download and install (macOS)
+
+Download `Prism-FX-<version>-macOS.zip` from the releases page, unzip it, and
+follow `INSTALL.txt`:
+1. Copy `Prism FX.component` to `~/Library/Audio/Plug-Ins/Components/` and
+   `Prism FX.vst3` to `~/Library/Audio/Plug-Ins/VST3/`.
+2. The plug-ins aren't notarized, so macOS may block them the first time. Run
+   this in Terminal to allow them:
+   ```bash
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Prism FX.component" ~/Library/Audio/Plug-Ins/VST3/"Prism FX.vst3"
+   ```
+3. Restart your DAW (in Logic, rescan in the Plug-in Manager if it doesn't
+   appear). Prism FX is listed under **Prismatic**.
+
+It runs on Apple Silicon and Intel Macs.
+
+To make the zip yourself, run `./Tools/package.sh`. It builds for both chips,
+signs the plug-ins ad hoc, and writes `dist/Prism-FX-<version>-macOS.zip`.
+
+
 
 | Section | Controls | Source |
 |---|---|---|

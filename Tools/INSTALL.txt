@@ -1,0 +1,26 @@
+Prism FX, by Prismatic
+======================
+
+An AU and VST3 effect for macOS (Apple Silicon and Intel), built from the
+CHOMPI effects and tape looper.
+
+Install
+-------
+1. Copy "Prism FX.component" to:   ~/Library/Audio/Plug-Ins/Components/
+   Copy "Prism FX.vst3" to:        ~/Library/Audio/Plug-Ins/VST3/
+   (In Finder, press Shift-Cmd-G and paste the folder path to get there.)
+
+2. These plug-ins aren't notarized by Apple, so macOS may block them the first
+   time. To allow them, open Terminal and run:
+
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/"Prism FX.component" ~/Library/Audio/Plug-Ins/VST3/"Prism FX.vst3"
+
+3. Restart your DAW.
+   - Logic: it scans new plug-ins on launch. If Prism FX doesn't appear, open
+     Settings > Plug-in Manager and click "Reset & Rescan Selection".
+   - Ableton Live: Settings > Plug-Ins, turn on "Use Audio Units v2" and/or
+     "Use VST3 Plug-In System Folders", then click Rescan.
+
+Prism FX shows up under the manufacturer "Prismatic".
+
+Source and docs: https://github.com/CHOMPI-Club/CHOMPI (the plugin folder).
