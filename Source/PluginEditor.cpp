@@ -7,7 +7,7 @@ using namespace prism::ui;
 namespace
 {
 // logical layout, in CSS-like px at 100% scale
-constexpr int kW = 1080, kH = 548;
+constexpr int kW = 1280, kH = 548;
 constexpr int kPadTop = 10, kPadSide = 20, kPadBottom = 16;
 constexpr int kStatusH = 30, kHeaderH = 64, kChainH = 40, kRow1H = 140;
 constexpr int kCell = 72; // one knob
@@ -248,6 +248,16 @@ void Look::drawPopupMenuBackgroundWithOptions(juce::Graphics& g, int w, int h, c
     g.drawRect(0, 0, w, h, 1);
 }
 
+void Look::drawPopupMenuSectionHeaderWithOptions(juce::Graphics& g, const juce::Rectangle<int>& area,
+                                                 const juce::String& text, const juce::PopupMenu::Options&)
+{
+    // section headers in the same mono caps as the knob labels
+    g.setColour(Muted());
+    g.setFont(Fonts::Caps(11.f));
+    DrawTracked(g, text.toUpperCase(), area.toFloat().withTrimmedLeft(12.f).withTrimmedTop(6.f), .8f,
+                juce::Justification::centredLeft);
+}
+
 juce::Font Look::getLabelFont(juce::Label& label)
 {
     if(dynamic_cast<juce::Slider*>(label.getParentComponent()) != nullptr)
@@ -281,8 +291,10 @@ PrismKnob::PrismKnob(APVTS& apvts, const char* id, const juce::String& name, boo
     // shift or cmd-drag for fine control; the wheel works by default
     slider_.setVelocityModeParameters(.4, 1, 0., true, (juce::ModifierKeys::Flags)(juce::ModifierKeys::shiftModifier | juce::ModifierKeys::commandModifier));
     auto* p = apvts.getParameter(id);
-    if(p != nullptr)
-        slider_.getProperties().set("bipolar", std::abs(p->getDefaultValue() - .5f) < 1e-3f);
+    // only controls with a real centre fill outwards from noon: the filter (low-pass / high-pass)
+    // and the gains (cut / boost). Everything else fills from the left.
+    const auto pid = juce::String(id);
+    slider_.getProperties().set("bipolar", pid == ids::cutoff || pid == ids::input || pid == ids::output);
     addAndMakeVisible(slider_);
 
     if(!header)
@@ -535,9 +547,19 @@ int Module::PreferredWidth() const
 
 void Module::Refresh()
 {
-    const bool collapsed = on_ != nullptr && on_->load() < .5f;
-    if(collapsed == collapsed_)
+    const bool off = on_ != nullptr && on_->load() < .5f;
+    if(off == off_)
         return;
+    off_ = off;
+    if(!folds_)
+    {
+        // stay put: dim the controls (they still work, so it can be set up before switching on)
+        for(auto* c : getChildren())
+            c->setAlpha(off ? .35f : 1.f);
+        repaint();
+        return;
+    }
+    const bool collapsed = off;
     collapsed_ = collapsed;
     for(auto* c : getChildren())
         c->setVisible(!collapsed);
@@ -561,7 +583,7 @@ void Module::mouseUp(const juce::MouseEvent& e)
     if(auto* p = apvts_.getParameter(onId_))
     {
         p->beginChangeGesture();
-        p->setValueNotifyingHost(collapsed_ ? 1.f : 0.f);
+        p->setValueNotifyingHost(off_ ? 1.f : 0.f);
         p->endChangeGesture();
     }
     Refresh();
@@ -593,10 +615,13 @@ void Module::paint(juce::Graphics& g)
     g.setFont(Fonts::Mono(11.f));
     const float nw = juce::GlyphArrangement::getStringWidth(Fonts::Mono(11.f), "00") + 8.f;
     g.drawText(num, line.removeFromLeft(nw).withTrimmedTop(5.f), juce::Justification::centredLeft);
-    g.setColour(Ink());
+    g.setColour(off_ ? Muted() : Ink());
     g.setFont(Fonts::Serif(23.f));
     const float tw = juce::GlyphArrangement::getStringWidth(Fonts::Serif(23.f), title_.toLowerCase());
-    g.drawText(title_.toLowerCase(), line.removeFromLeft(tw + 2.f), juce::Justification::centredLeft);
+    const auto  tr = line.removeFromLeft(tw + 2.f);
+    g.drawText(title_.toLowerCase(), tr, juce::Justification::centredLeft);
+    if(off_)
+        g.fillRect(tr.getX(), tr.getCentreY() + 2.f, tw, 1.2f); // struck through, like the chain bar
     if(note_)
     {
         g.setColour(Muted());
@@ -937,7 +962,7 @@ void StepLane::paint(juce::Graphics& g)
     for(int i = 0; i < 8; ++i)
     {
         const int  step = page * 8 + i;
-        const auto r    = juce::Rectangle<float>(i * 22.f + .5f, getHeight() * .5f - 6.f + .5f, 18.f, 12.f);
+        const auto r    = juce::Rectangle<float>(i * 22.f + 1.f, getHeight() * .5f - 6.f + .5f, 18.f, 12.f);
         if(step >= steps)
         {
             g.setColour(T().track);
@@ -1116,20 +1141,7 @@ namespace
 {
 const juce::Identifier kThemeProp{"uiTheme"}, kScaleProp{"uiScale"};
 
-/** Resizing snaps to 100 / 125 / 150 / 200% */
-struct SnapConstrainer : juce::ComponentBoundsConstrainer
-{
-    void checkBounds(juce::Rectangle<int>& b, const juce::Rectangle<int>&, const juce::Rectangle<int>&, bool, bool, bool,
-                     bool) override
-    {
-        const float want = (float)b.getWidth() / (float)kW;
-        float       best = 1.f;
-        for(float step : {1.f, 1.25f, 1.5f, 2.f})
-            if(std::abs(step - want) < std::abs(best - want))
-                best = step;
-        b.setSize(juce::roundToInt(kW * best), juce::roundToInt(kH * best));
-    }
-};
+constexpr float kMinScale = .75f, kMaxScale = 2.f;
 } // namespace
 
 PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
@@ -1230,6 +1242,7 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
 
     // ---- glitch
     glitch_ = std::make_unique<Module>(s, "Glitch Delay", ids::glitchOn);
+    glitch_->SetFolds(false); // too big to fold: a 36 px strip next to a stretched looper looks odd
     {
         auto div = s.getRawParameterValue(ids::glitchDiv), rate = s.getRawParameterValue(ids::glitchRate),
              pat = s.getRawParameterValue(ids::glitchPattern), mode = s.getRawParameterValue(ids::glitchMode);
@@ -1251,7 +1264,7 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
     }
     glitch_->NewLine(28);
     stepLane_ = &keep(std::make_unique<StepLane>(p));
-    glitch_->AddFixed(*stepLane_, 8 * 22 - 4);
+    glitch_->AddFixed(*stepLane_, 8 * 22);
     glitch_->AddFlexible(keep(std::make_unique<juce::Component>()), 0);
     for(auto [id, text] : {std::pair{ids::glitchRetrig, "Retrig"}, std::pair{ids::glitchReverse, "Reverse"},
                            std::pair{ids::glitchOctUp, "Oct up"}, std::pair{ids::glitchOctDown, "Oct down"}})
@@ -1425,10 +1438,16 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
     addAndMakeVisible(canvas_);
     canvas_.setBounds(0, 0, kW, kH);
 
-    snap_ = std::make_unique<SnapConstrainer>();
+    // drag the corner to any size between 75% and 200%; the shape stays the same.
+    // Read the saved size first: setting up the constrainer resizes the window, which would overwrite it.
+    const float savedScale = (float)(double)s.state.getProperty(kScaleProp, 1.0);
+    snap_ = std::make_unique<juce::ComponentBoundsConstrainer>();
+    snap_->setFixedAspectRatio((double)kW / (double)kH);
+    snap_->setSizeLimits(juce::roundToInt(kW * kMinScale), juce::roundToInt(kH * kMinScale),
+                         juce::roundToInt(kW * kMaxScale), juce::roundToInt(kH * kMaxScale));
     setResizable(true, true);
     setConstrainer(snap_.get());
-    ApplyScale((float)(double)s.state.getProperty(kScaleProp, 1.0));
+    ApplyScale(savedScale);
 
     timerCallback();
     startTimerHz(30);
@@ -1478,20 +1497,20 @@ void PrismEditor::ApplyTheme(bool cream)
 
 void PrismEditor::ApplyScale(float scale)
 {
-    scale_ = scale;
-    proc_.apvts.state.setProperty(kScaleProp, (double)scale, nullptr);
-    setSize(juce::roundToInt(kW * scale), juce::roundToInt(kH * scale));
+    scale_ = juce::jlimit(kMinScale, kMaxScale, scale);
+    setSize(juce::roundToInt(kW * scale_), juce::roundToInt(kH * scale_));
 }
 
 void PrismEditor::ShowViewMenu()
 {
     juce::PopupMenu m;
+    m.setLookAndFeel(&look_);
     m.addSectionHeader("Theme");
     m.addItem("Night", true, !IsCream(), [this] { ApplyTheme(false); });
     m.addItem("Cream", true, IsCream(), [this] { ApplyTheme(true); });
     m.addSectionHeader("Size");
-    for(float sc : {1.f, 1.25f, 1.5f, 2.f})
-        m.addItem(juce::String(juce::roundToInt(sc * 100.f)) + "%", true, std::abs(scale_ - sc) < .01f, [this, sc] { ApplyScale(sc); });
+    for(float sc : {.75f, 1.f, 1.25f, 1.5f})
+        m.addItem(juce::String(juce::roundToInt(sc * 100.f)) + "%", true, std::abs(scale_ - sc) < .02f, [this, sc] { ApplyScale(sc); });
     m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&view_));
 }
 
@@ -1572,8 +1591,13 @@ void PrismEditor::paint(juce::Graphics& g) { g.fillAll(Bg()); }
 
 void PrismEditor::resized()
 {
+    if(getWidth() <= 0)
+        return;
     const float sc = (float)getWidth() / (float)kW;
     canvas_.setTransform(juce::AffineTransform::scale(sc));
+    // remember the size, whether it came from the menu or a corner drag
+    scale_ = sc;
+    proc_.apvts.state.setProperty(kScaleProp, (double)sc, nullptr);
 }
 
 void PrismEditor::PaintCanvas(juce::Graphics& g)
@@ -1591,17 +1615,17 @@ void PrismEditor::PaintCanvas(juce::Graphics& g)
             if(m->getY() == row->getY() && m->getRight() < row->getRight() - 2)
                 Rule(g, (float)m->getRight(), (float)row->getY(), 1.f, (float)row->getHeight());
 
-    // wordmark, with a four-point star over the i
+    // wordmark, with a four-point star over the m, next to the FX
     const auto  word  = Fonts::Serif(54.f).withExtraKerningFactor(-.028f);
     const float midY  = yStatus + 1 + kHeaderH * .5f;
     g.setFont(word);
-    g.drawText("Prism FX", juce::Rectangle<float>(x0, midY - 30.f, 240.f, 60.f), juce::Justification::centredLeft);
+    g.drawText("Prism FX", juce::Rectangle<float>(x0, midY - 27.f, 240.f, 60.f), juce::Justification::centredLeft);
     {
-        const float pr = juce::GlyphArrangement::getStringWidth(word, "Pr");
-        const float iw = juce::GlyphArrangement::getStringWidth(word, "i");
-        const float sx = x0 + pr + iw * .5f, sy = midY - 25.f;
+        const float pr = juce::GlyphArrangement::getStringWidth(word, "Pris");
+        const float mw = juce::GlyphArrangement::getStringWidth(word, "m");
+        const float sx = x0 + pr + mw * .5f, sy = midY - 22.f;
         juce::Path  star;
-        const float r = 10.f, k = 1.6f;
+        const float r = 7.5f, k = 1.2f;
         star.startNewSubPath(sx, sy - r);
         star.quadraticTo(sx + k, sy - k, sx + r, sy);
         star.quadraticTo(sx + k, sy + k, sx, sy + r);
@@ -1632,7 +1656,7 @@ void PrismEditor::LayoutCanvas()
         for(auto* k : {squash_.get(), output_.get(), dryWet_.get(), input_.get()})
         {
             const int kw = k == squash_.get() ? 136 : 108;
-            k->setBounds(x - kw, y + 14, kw, 36);
+            k->setBounds(x - kw, y + 10, kw, 44);
             x -= kw + 14;
         }
     }
@@ -1659,7 +1683,8 @@ void PrismEditor::LayoutCanvas()
         int              total = 0, flexTotal = 0;
         for(auto& [m, fw] : mods)
         {
-            const int wv = m->IsCollapsed() ? kCollapsedW : fw > 0 ? fw : m->PreferredWidth();
+            // a fixed width is a minimum: a module never gets less than its contents need
+            const int wv = m->IsCollapsed() ? kCollapsedW : juce::jmax(fw, m->PreferredWidth());
             want.push_back(wv);
             total += wv;
             if(!m->IsCollapsed() && fw == 0)

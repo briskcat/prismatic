@@ -24,6 +24,8 @@ class Look : public juce::LookAndFeel_V4
     juce::Font getComboBoxFont(juce::ComboBox&) override;
     juce::Font getPopupMenuFont() override;
     void drawPopupMenuBackgroundWithOptions(juce::Graphics&, int w, int h, const juce::PopupMenu::Options&) override;
+    void drawPopupMenuSectionHeaderWithOptions(juce::Graphics&, const juce::Rectangle<int>&, const juce::String&,
+                                               const juce::PopupMenu::Options&) override;
     juce::Font getLabelFont(juce::Label&) override;
     juce::Label* createSliderTextBox(juce::Slider&) override;
     juce::Slider::SliderLayout getSliderLayout(juce::Slider&) override;
@@ -155,6 +157,8 @@ class Module : public juce::Component
 
     int  PreferredWidth() const;
     bool IsCollapsed() const { return collapsed_; }
+    /** Big modules don't fold when switched off: they stay in place, dimmed, with the title struck through */
+    void SetFolds(bool folds) { folds_ = folds; }
     void Refresh();
     std::function<void()> onCollapse;
 
@@ -186,6 +190,8 @@ class Module : public juce::Component
     std::atomic<float>*                           on_        = nullptr;
     const char*                                   onId_      = nullptr;
     bool                                          collapsed_ = false;
+    bool                                          folds_     = true;
+    bool                                          off_       = false;
     std::vector<std::pair<juce::Component*, int>> headers_;
     std::vector<Item>                             items_;
     std::vector<int>                              lineH_;

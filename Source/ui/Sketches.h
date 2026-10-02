@@ -225,10 +225,6 @@ inline void Delay(juce::Graphics& g, R r, float timeNorm, float fb, float mix, b
     Pen(g, dry, 2.6f, Ink().withAlpha(.45f));
     Pen(g, wet, 2.4f);
     Note(g, r, vari ? "tape loop" : "classic", juce::Justification::bottomRight);
-    g.setFont(Fonts::Mono(11.f));
-    g.setColour(Ink().withAlpha(.5f));
-    g.drawText("L", plot.withWidth(12.f), juce::Justification::topLeft);
-    g.drawText("R", plot.withWidth(12.f), juce::Justification::bottomLeft);
 }
 
 // reverb: the first hit, then a tail as long as the decay, as dense as the diffusion,

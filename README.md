@@ -36,7 +36,8 @@ header.
 **Look:** indie editorial: one ink on a flat ground, hairline rules, Instrument
 Serif with DM Mono caps, outlined pills.
 - **View** (next to Reset) picks the **Night** or **Cream** theme and the size
-  (100 / 125 / 150 / 200%). Both are saved with the project.
+  (75 to 150%). You can also drag the bottom-right corner to any size from
+  75% to 200%. Both are saved with the project.
 - **Pills:** toggles fill with the accent colour when on. Actions (rec, play,
   clear) have a red outline and fill red while pressed; rec stays red while
   recording.
@@ -44,8 +45,11 @@ Serif with DM Mono caps, outlined pills.
   off (off names are struck through), drag a name to reorder, and **Reset**
   restores the default order. Modules are numbered by their place in the chain.
 - **Off effects fold** to a narrow strip with the name struck through. Click
-  the strip to bring the effect back.
-- **Knobs:** double-click resets to default; shift- or cmd-drag for fine moves;
+  the strip to bring the effect back. The glitch delay is too big to fold: it
+  stays in place, dimmed, with its title struck through, and its controls
+  still work so you can set it up before switching it on.
+- **Knobs:** the arc fills from the left, except on LP/HP, Input and Output,
+  which have a real centre and fill out from noon. Double-click resets to default; shift- or cmd-drag for fine moves;
   the mouse wheel works too.
 - **The status line** at the top shows the last control you touched (with a
   small bar for where it's set), and on the right the tempo and what the looper
