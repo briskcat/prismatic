@@ -7,7 +7,7 @@ using namespace prism::ui;
 namespace
 {
 // logical layout, in CSS-like px at 100% scale
-constexpr int kW = 1280, kH = 548;
+constexpr int kW = 1320, kH = 548;
 constexpr int kPadTop = 10, kPadSide = 20, kPadBottom = 16;
 constexpr int kStatusH = 30, kHeaderH = 64, kChainH = 40, kRow1H = 140;
 constexpr int kCell = 72; // one knob
@@ -475,6 +475,223 @@ void UnderlineCombo::paint(juce::Graphics& g)
                 juce::Justification::centredLeft);
     g.setColour(Ink().withMultipliedAlpha(isEnabled() ? 1.f : .4f));
     Rule(g, 0.f, (float)getHeight() - 1.f, (float)kInlineLabelW, 1.f);
+}
+
+// ---------------------------------------------------------------- loop drag
+
+LoopDrag::LoopDrag(PrismProcessor& p) : proc_(p)
+{
+    setTooltip("Drag onto an audio track to drop the loop in as a WAV file");
+    setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+}
+
+int LoopDrag::NaturalWidth() const { return juce::roundToInt(TrackedWidth(Fonts::Caps(11.f, true), "DRAG LOOP", .8f)) + 22 + 14; }
+
+bool LoopDrag::HasLoop() const
+{
+    const auto& looper = proc_.Looper();
+    return looper.GetLength() > 0 && looper.GetState() != TapeLooper::State::Recording;
+}
+
+void LoopDrag::Poll()
+{
+    if(const bool has = HasLoop(); has != had_)
+    {
+        had_ = has;
+        setMouseCursor(has ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void LoopDrag::paint(juce::Graphics& g)
+{
+    const float alpha = had_ ? 1.f : .35f;
+    const auto  r     = getLocalBounds().toFloat().withSizeKeepingCentre((float)getWidth() - 1.f, 22.f).reduced(.5f);
+    g.setColour((dragging_ ? Accent() : Ink()).withMultipliedAlpha(alpha));
+    if(dragging_)
+        g.fillRoundedRectangle(r, r.getHeight() * .5f);
+    else
+        g.drawRoundedRectangle(r, r.getHeight() * .5f, 1.f);
+    // a grip of dots, then the label
+    g.setColour((dragging_ ? Bg() : Ink()).withMultipliedAlpha(alpha));
+    for(int row = 0; row < 3; ++row)
+        for(int col = 0; col < 2; ++col)
+            g.fillEllipse(r.getX() + 11.f + col * 4.f, r.getCentreY() - 5.f + row * 4.f, 2.f, 2.f);
+    g.setFont(Fonts::Caps(11.f, true));
+    DrawTracked(g, "DRAG LOOP", r.withTrimmedLeft(24.f).withTrimmedTop(1.f), .8f, juce::Justification::centredLeft);
+}
+
+juce::File LoopDrag::WriteLoop() const
+{
+    // the part that's playing, as it sits on the tape (before speed and reverse); it may wrap
+    const auto&  looper = proc_.Looper();
+    const size_t len    = looper.GetLength();
+    const size_t ws = looper.GetWindowStart(), wl = juce::jmin(looper.GetWindowLength(), len);
+    if(len == 0 || wl == 0)
+        return {};
+    // somewhere that lasts: Ableton plays dropped files from where they are until the set is collected
+    auto dir = juce::File::getSpecialLocation(juce::File::userMusicDirectory).getChildFile("Prism FX").getChildFile("Loops");
+    dir.createDirectory();
+    const auto name = "Prism loop " + juce::String(juce::roundToInt(proc_.uiBpm.load())) + " bpm "
+                      + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H.%M.%S");
+    const auto file = dir.getNonexistentChildFile(name, ".wav", false);
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(file);
+    juce::WavAudioFormat format;
+    auto writer = format.createWriterFor(
+        stream, juce::AudioFormatWriterOptions().withSampleRate(proc_.getSampleRate()).withNumChannels(2).withBitsPerSample(24));
+    if(writer == nullptr)
+        return {};
+    const size_t first = juce::jmin(wl, len - ws);
+    const float* a[]   = {looper.DataL() + ws, looper.DataR() + ws};
+    writer->writeFromFloatArrays(a, 2, static_cast<int>(first));
+    if(wl > first) // the rest wraps around from the start of the tape
+    {
+        const float* b[] = {looper.DataL(), looper.DataR()};
+        writer->writeFromFloatArrays(b, 2, static_cast<int>(wl - first));
+    }
+    return file;
+}
+
+void LoopDrag::mouseDrag(const juce::MouseEvent& e)
+{
+    if(dragging_ || !had_ || e.getDistanceFromDragStart() < 4)
+        return;
+    const auto file = WriteLoop();
+    if(file == juce::File())
+        return;
+    dragging_ = true;
+    repaint();
+    juce::Component::SafePointer<LoopDrag> safe(this);
+    juce::DragAndDropContainer::performExternalDragDropOfFiles({file.getFullPathName()}, false, this, [safe] {
+        if(safe != nullptr)
+        {
+            safe->dragging_ = false;
+            safe->repaint();
+        }
+    });
+}
+
+void LoopDrag::mouseUp(const juce::MouseEvent&)
+{
+    dragging_ = false;
+    repaint();
+}
+
+// ---------------------------------------------------------------- moves menu
+
+MovesMenu::MovesMenu(APVTS& apvts) : apvts_(apvts) { setMouseCursor(juce::MouseCursor::PointingHandCursor); }
+
+juce::String MovesMenu::Text() const
+{
+    auto v = [&](const char* id) { return apvts_.getRawParameterValue(id)->load(); };
+    if(v(ids::loopWander) <= 0.f)
+        return "Off";
+    const int how   = juce::jlimit(0, 2, (int)v(ids::loopMoves));
+    const int every = juce::jlimit(0, (int)std::size(kLoopEveryNames) - 1, (int)v(ids::loopEvery));
+    return juce::String(kLoopMoves[how]).toLowerCase() + juce::String::fromUTF8(" \xc2\xb7 ") + kLoopEveryNames[every];
+}
+
+void MovesMenu::Poll()
+{
+    if(auto t = Text(); t != last_)
+    {
+        last_ = t;
+        repaint();
+    }
+}
+
+void MovesMenu::paint(juce::Graphics& g)
+{
+    // the same look as the other dropdowns: caps label, serif value, underline, chevron
+    auto r = getLocalBounds().toFloat();
+    g.setColour(Muted());
+    g.setFont(Fonts::Caps(11.f));
+    DrawTracked(g, "MOVEMENT", r.removeFromTop(13.f), .8f, juce::Justification::centredLeft);
+    r.removeFromTop(2.f);
+    g.setColour(Ink());
+    g.setFont(Fonts::Serif(17.f));
+    g.drawFittedText(Text(), r.withTrimmedRight(18.f).withTrimmedBottom(2.f).toNearestInt(), juce::Justification::centredLeft, 1, .8f);
+    Rule(g, 0.f, (float)getHeight() - 1.f, (float)getWidth(), 1.f);
+    juce::Path  ch;
+    const float cx = (float)getWidth() - 7.f, cy = r.getCentreY();
+    ch.startNewSubPath(cx - 4.f, cy - 2.f);
+    ch.lineTo(cx, cy + 2.f);
+    ch.lineTo(cx + 4.f, cy - 2.f);
+    g.strokePath(ch, juce::PathStrokeType(1.2f));
+}
+
+void MovesMenu::Set(const char* id, float plain)
+{
+    if(auto* p = apvts_.getParameter(id))
+    {
+        p->beginChangeGesture();
+        p->setValueNotifyingHost(p->convertTo0to1(plain));
+        p->endChangeGesture();
+    }
+}
+
+void MovesMenu::mouseDown(const juce::MouseEvent&)
+{
+    auto v = [&](const char* id) { return (int)apvts_.getRawParameterValue(id)->load(); };
+    juce::PopupMenu m;
+    m.setLookAndFeel(&getLookAndFeel());
+    auto item = [&](const juce::String& text, const juce::String& hint, bool ticked, std::function<void()> fn) {
+        juce::PopupMenu::Item it(text);
+        it.isTicked              = ticked;
+        it.shortcutKeyDescription = hint; // drawn on the right, in the menu's own style
+        it.action                = std::move(fn);
+        m.addItem(std::move(it));
+    };
+    m.addSectionHeader("How it moves");
+    for(int i = 0; i < 3; ++i)
+        item(juce::String(kLoopMoves[i]).toLowerCase(), kLoopMoveHints[i], v(ids::loopMoves) == i, [this, i] { Set(ids::loopMoves, (float)i); });
+    m.addSectionHeader("How often");
+    for(int i = 0; i < (int)std::size(kLoopEveryNames); ++i)
+        item(kLoopEveryNames[i], {}, v(ids::loopEvery) == i, [this, i] { Set(ids::loopEvery, (float)i); });
+    m.addSectionHeader("Changes land");
+    item("at the end of a pass", {}, v(ids::loopLand) == 0, [this] { Set(ids::loopLand, 0.f); });
+    item("right away", {}, v(ids::loopLand) == 1, [this] { Set(ids::loopLand, 1.f); });
+    m.addSeparator();
+    const int seed = v(ids::loopSeed);
+    item("new seed", "seed " + juce::String(seed), false, [this, seed] {
+        juce::Random rng;
+        int next = seed;
+        while(next == seed)
+            next = 1 + rng.nextInt(999);
+        Set(ids::loopSeed, (float)next);
+    });
+    m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMinimumWidth(juce::jmax(getWidth(), 220)));
+}
+
+// ---------------------------------------------------------------- grid
+
+Grid::Grid(std::vector<juce::Component*> items, int cols, int rowH, int gapX, int gapY, bool rule)
+    : items_(std::move(items)), cols_(cols), rowH_(rowH), gapX_(gapX), gapY_(gapY), rule_(rule)
+{
+    for(auto* c : items_)
+        addAndMakeVisible(c);
+}
+
+void Grid::resized()
+{
+    const int rows = ((int)items_.size() + cols_ - 1) / cols_;
+    const int h    = rows * rowH_ + (rows - 1) * gapY_;
+    auto      b    = getLocalBounds().withTrimmedLeft(rule_ ? 16 : 0);
+    const int cw   = (b.getWidth() - (cols_ - 1) * gapX_) / cols_;
+    const int y0   = (getHeight() - h) / 2;
+    for(size_t i = 0; i < items_.size(); ++i)
+    {
+        const int r = (int)i / cols_, c = (int)i % cols_;
+        items_[i]->setBounds(b.getX() + c * (cw + gapX_), y0 + r * (rowH_ + gapY_), cw, rowH_);
+    }
+}
+
+void Grid::paint(juce::Graphics& g)
+{
+    if(!rule_)
+        return;
+    g.setColour(T().track);
+    g.fillRect(0.f, 6.f, 1.f, (float)getHeight() - 12.f);
 }
 
 // ---------------------------------------------------------------- column
@@ -1090,7 +1307,7 @@ juce::Rectangle<float> LoopStrip::Box() const { return getLocalBounds().toFloat(
 
 juce::Rectangle<float> LoopStrip::Wave() const
 {
-    // the waveform sits between the start/end tags and the bar ruler
+    // the waveform sits between the tags and the bar ruler
     return Box().withTrimmedTop(kTagH + 2.f).withTrimmedBottom(kRulerH).reduced(8.f, 2.f);
 }
 
@@ -1106,30 +1323,63 @@ float LoopStrip::FracAt(float x) const
     return juce::jlimit(0.f, 1.f, (x - w.getX()) / w.getWidth());
 }
 
-std::pair<size_t, size_t> LoopStrip::Window(size_t len) const
+LoopStrip::Win LoopStrip::Target(size_t len) const
 {
     auto& st = proc_.apvts;
-    return PrismProcessor::LoopWindow(len, proc_.LoopSnapUnit(), st.getRawParameterValue(ids::loopStart)->load(),
-                                      st.getRawParameterValue(ids::loopEnd)->load());
+    const auto [start, length] = PrismProcessor::LoopWindow(len, proc_.LoopSnapUnit(), st.getRawParameterValue(ids::loopPos)->load(),
+                                                            st.getRawParameterValue(ids::loopLen)->load());
+    const int64_t moved = proc_.Looper().GetWanderOffset();
+    const int64_t l     = (int64_t)len;
+    return {(size_t)((((int64_t)start + moved) % l + l) % l), length};
 }
 
-const char* LoopStrip::HandleAt(juce::Point<float> p) const
+LoopStrip::Win LoopStrip::Current(size_t len) const
 {
-    const auto&  looper = proc_.Looper();
-    const size_t len    = looper.GetLength();
-    if(len == 0 || looper.GetState() == TapeLooper::State::Recording)
-        return nullptr;
-    // the tags are the easiest thing to grab
-    if(startTag_.contains(p))
-        return ids::loopStart;
-    if(endTag_.contains(p))
-        return ids::loopEnd;
-    const auto [ws, we] = Window(len);
-    const float xs = XFor(ws / (float)len), xe = XFor(we / (float)len);
-    const float ds = std::abs(p.x - xs), de = std::abs(p.x - xe);
-    if(juce::jmin(ds, de) > 10.f)
-        return nullptr;
-    return ds < de || (ds == de && p.x < xs) ? ids::loopStart : ids::loopEnd;
+    const auto& looper = proc_.Looper();
+    const Win   w{looper.GetWindowStart(), looper.GetWindowLength()};
+    return w.length == 0 || w.length > len ? Target(len) : w;
+}
+
+std::vector<juce::Range<float>> LoopStrip::Spans(Win w, size_t len) const
+{
+    const float s = w.start / (float)len, e = s + w.length / (float)len;
+    if(e <= 1.f + 1e-6f)
+        return {{XFor(s), XFor(juce::jmin(1.f, e))}};
+    return {{XFor(s), XFor(1.f)}, {XFor(0.f), XFor(e - 1.f)}};
+}
+
+juce::String LoopStrip::PosText(Win w, size_t len) const
+{
+    const double sr = proc_.getSampleRate(), bpm = proc_.uiBpm.load();
+    if(proc_.LoopSnapUnit() > 0.0 && sr > 0.0)
+    {
+        // bar.beat.sixteenth, like the DAW, counted from where the recording began
+        const double beats = w.start / (60.0 / bpm * sr);
+        const int    six   = (int)std::floor(beats * 4.0 + 1e-6);
+        return "POS " + juce::String(six / 16 + 1) + "." + juce::String(six / 4 % 4 + 1) + "." + juce::String(six % 4 + 1);
+    }
+    return "POS " + juce::String(100.0 * w.start / (double)len, 1) + "%";
+}
+
+juce::String LoopStrip::LenText(Win w, size_t len) const
+{
+    const double sr = proc_.getSampleRate(), bpm = proc_.uiBpm.load();
+    if(sr <= 0.0)
+        return "LEN";
+    if(proc_.LoopSnapUnit() > 0.0)
+    {
+        const double beats = w.length / (60.0 / bpm * sr);
+        const double bars  = beats / 4.0;
+        if(std::abs(bars - std::round(bars)) < .01)
+            return "LEN " + juce::String(juce::roundToInt(bars)) + (juce::roundToInt(bars) == 1 ? " BAR" : " BARS");
+        auto num = juce::String(beats, 2);
+        while(num.endsWithChar('0'))
+            num = num.dropLastCharacters(1);
+        num = num.trimCharactersAtEnd(".");
+        return "LEN " + num + (num == "1" ? " BEAT" : " BEATS");
+    }
+    juce::ignoreUnused(len);
+    return "LEN " + juce::String(w.length / sr, 2) + " S";
 }
 
 void LoopStrip::DrawRuler(juce::Graphics& g, juce::Rectangle<float> ruler, size_t len) const
@@ -1170,7 +1420,8 @@ void LoopStrip::paint(juce::Graphics& g)
     const auto&  looper = proc_.Looper();
     const auto   state  = looper.GetState();
     const size_t len    = looper.GetLength();
-    if(state == TapeLooper::State::Empty)
+    startTag_ = endTag_ = {};
+    if(state == TapeLooper::State::Empty || len == 0)
     {
         g.setColour(Muted());
         g.setFont(Fonts::Serif(17.f, true));
@@ -1183,14 +1434,20 @@ void LoopStrip::paint(juce::Graphics& g)
     const auto  ruler  = juce::Rectangle<float>(box.getX(), box.getBottom() - kRulerH, box.getWidth(), kRulerH);
     const float mid    = wave.getCentreY(), halfH = wave.getHeight() * .5f;
     const auto  bins   = (len + TapeLooper::kPeakBin - 1) / TapeLooper::kPeakBin;
-    const bool  window = state != TapeLooper::State::Recording && len > 0;
-    const auto  win    = window ? Window(len) : std::pair<size_t, size_t>{0, len};
-    const float xs     = XFor(win.first / (float)len);
-    const float xe     = XFor(win.second / (float)len);
+    const bool  window = state != TapeLooper::State::Recording;
+    const Win   cur    = window ? Current(len) : Win{0, len};
+    const Win   tgt    = window ? Target(len) : cur;
+    const auto  spans  = Spans(cur, len);
+    const bool  wraps  = spans.size() > 1;
     const bool  hot    = state == TapeLooper::State::Recording || looper.IsDubbing();
-    startTag_ = endTag_ = {};
+    auto inside = [&](float x) {
+        for(auto& r : spans)
+            if(x >= r.getStart() && x < r.getEnd())
+                return true;
+        return false;
+    };
 
-    // waveform: one bar every 2 px, bright inside the loop window
+    // waveform: one bar every 2 px, bright inside the playing window
     for(int x = 0; x < (int)wave.getWidth(); x += 2)
     {
         const size_t b0   = bins * (size_t)x / (size_t)wave.getWidth();
@@ -1199,39 +1456,45 @@ void LoopStrip::paint(juce::Graphics& g)
         for(size_t b = b0; b < juce::jmin(b1, bins); ++b)
             peak = std::fmax(peak, looper.Peak(b));
         const float px = wave.getX() + x;
-        const bool  in = px >= xs && px < xe;
+        const bool  in = inside(px);
         g.setColour(hot && in ? Red() : in ? Ink() : Muted().withAlpha(.45f));
         const float h = juce::jlimit(.5f, halfH, std::sqrt(peak) * halfH);
         g.fillRect(px, mid - h, 1.f, h * 2.f);
     }
 
-    // ruler along the bottom
+    // ruler along the bottom, with a trail of where the window has been
     g.setColour(T().track);
     g.fillRect(box.getX(), ruler.getY(), box.getWidth(), 1.f);
     DrawRuler(g, ruler, len);
+    if(window)
+        for(int i = TapeLooper::kTrail - 1; i >= 0; --i)
+            if(const int64_t t = looper.GetTrail(i); t >= 0)
+            {
+                g.setColour(Accent().withAlpha(.65f - .18f * (float)i));
+                for(auto& r : Spans({(size_t)t, cur.length}, len))
+                    g.fillRoundedRectangle(r.getStart(), ruler.getBottom() - 5.f, juce::jmax(2.f, r.getLength()), 3.f, 1.5f);
+            }
 
     // the snap grid: dotted lines inside the window
-    const int snapIdx = juce::jlimit(0, (int)std::size(kLoopSnaps) - 1,
-                                     (int)proc_.apvts.getRawParameterValue(ids::loopSnap)->load());
-    if(window && kLoopSnaps[snapIdx].beats > 0.f && proc_.getSampleRate() > 0.0)
+    const int    snapIdx = juce::jlimit(0, (int)std::size(kLoopSnaps) - 1, (int)proc_.apvts.getRawParameterValue(ids::loopSnap)->load());
+    const double unit    = proc_.LoopSnapUnit();
+    if(window && unit > 0.0 && XFor((float)(unit / (double)len)) - XFor(0.f) >= 4.f)
     {
-        const double unit = kLoopSnaps[snapIdx].beats * 60.0 / proc_.uiBpm.load() * proc_.getSampleRate();
-        if(XFor((float)(unit / (double)len)) - XFor(0.f) >= 4.f)
+        g.setColour(Muted());
+        for(double at = unit; at < (double)len; at += unit)
         {
-            g.setColour(Muted());
-            for(double at = 0.0; at <= (double)len; at += unit)
-            {
-                const float x = XFor((float)(at / (double)len));
-                if(x <= xs + 1.f || x >= xe - 1.f)
-                    continue;
-                for(float y = wave.getY(); y < ruler.getY(); y += 4.f)
-                    g.fillRect(x - .5f, y, 1.f, 1.5f);
-            }
+            const float x = XFor((float)(at / (double)len));
+            if(!inside(x - 1.f) || !inside(x + 1.f))
+                continue;
+            for(float y = wave.getY(); y < ruler.getY(); y += 4.f)
+                g.fillRect(x - .5f, y, 1.f, 1.5f);
         }
     }
     {
         // the caption gets its own patch of ruler, so ticks don't run through it
-        const auto  cap  = kLoopSnaps[snapIdx].beats > 0.f ? "snapping to " + juce::String(kLoopSnaps[snapIdx].name) : juce::String("free points");
+        juce::String cap = unit > 0.0 ? "snapping to " + juce::String(kLoopSnaps[snapIdx].name) : juce::String("free points");
+        if(window && wraps)
+            cap << juce::String::fromUTF8(" \xc2\xb7 wraps");
         const auto  font = Fonts::Serif(14.f, true);
         const float cw   = juce::GlyphArrangement::getStringWidth(font, cap) + 14.f;
         const auto  cr   = ruler.withTrimmedTop(1.f).removeFromRight(cw + 8.f).withTrimmedBottom(1.f);
@@ -1241,88 +1504,177 @@ void LoopStrip::paint(juce::Graphics& g)
         g.setFont(font);
         g.drawText(cap, cr.withTrimmedRight(8.f), juce::Justification::centredRight);
     }
+    if(!window)
+        return;
 
-    if(window)
+    // the next pass, when a change is waiting for this one to finish
+    const auto lane = juce::Rectangle<float>(box.getX(), box.getY() + kTagH + 1.f, box.getWidth(), ruler.getY() - box.getY() - kTagH - 2.f);
+    if(tgt != cur && state == TapeLooper::State::Playing)
     {
-        // handles with their tags: start's tag to the right of its line, end's to the left
         g.setColour(Accent());
-        for(float hx : {xs, xe})
-            g.fillRect(hx - 1.f, box.getY(), 2.f, ruler.getY() - box.getY());
-        const auto  tagFont = Fonts::Caps(10.f, true);
-        auto        tag     = [&](const juce::String& t) { return TrackedWidth(tagFont, t, .6f) + 12.f; };
-        const auto  st      = "START " + juce::String(juce::roundToInt(100.f * win.first / (float)len)) + "%";
-        const auto  et      = "END " + juce::String(juce::roundToInt(100.f * win.second / (float)len)) + "%";
-        const float sw = tag(st), ew = tag(et);
-        float       sx = xs, ex = xe - ew;
-        if(sx + sw > ex) // too close: put them outside the window instead
+        const float dash[] = {4.f, 3.f};
+        for(auto& r : Spans(tgt, len))
         {
-            sx = xs - sw;
-            ex = xe;
+            const auto rr = lane.withX(r.getStart()).withWidth(juce::jmax(2.f, r.getLength()));
+            for(auto edge : {juce::Line<float>(rr.getTopLeft(), rr.getTopRight()), juce::Line<float>(rr.getBottomLeft(), rr.getBottomRight()),
+                             juce::Line<float>(rr.getTopLeft(), rr.getBottomLeft()), juce::Line<float>(rr.getTopRight(), rr.getBottomRight())})
+                g.drawDashedLine(edge, dash, 2, 1.f);
         }
-        sx = juce::jlimit(box.getX(), box.getRight() - sw, sx);
-        ex = juce::jlimit(box.getX(), box.getRight() - ew, ex);
-        startTag_ = {sx, box.getY(), sw, kTagH};
-        endTag_   = {ex, box.getY(), ew, kTagH};
-        for(auto [x, w, t] : {std::tuple{sx, sw, st}, std::tuple{ex, ew, et}})
-        {
-            const auto r = juce::Rectangle<float>(x, box.getY(), w, kTagH);
-            g.setColour(Accent());
-            g.fillRect(r);
-            g.setColour(Bg());
-            g.setFont(tagFont);
-            DrawTracked(g, t, r.withTrimmedLeft(6.f).withTrimmedTop(1.f), .6f, juce::Justification::centredLeft);
-        }
-
-        // playhead
-        const float px = XFor(looper.GetPosition() / (float)len);
-        g.setColour(Red());
-        g.fillRect(px - 1.f, box.getY() + kTagH, 2.f, ruler.getY() - box.getY() - kTagH);
+        const auto  r0   = Spans(tgt, len)[0];
+        const auto  font = Fonts::Serif(14.f, true);
+        const auto  lr   = juce::Rectangle<float>(r0.getStart() + 3.f, lane.getY() + 2.f,
+                                                  juce::GlyphArrangement::getStringWidth(font, "next pass") + 8.f, 16.f);
+        g.setColour(Bg());
+        g.fillRect(lr);
+        g.setColour(Accent());
+        g.setFont(font);
+        g.drawText("next pass", lr.withTrimmedLeft(4.f), juce::Justification::centredLeft);
     }
+
+    // handles where it's set, with their tags: position on the left edge, length on the right
+    const auto  tspans = Spans(tgt, len);
+    const float xs = tspans.front().getStart(), xe = tspans.back().getEnd();
+    g.setColour(Accent());
+    for(float hx : {xs, xe})
+        g.fillRect(hx - 1.f, box.getY(), 2.f, ruler.getY() - box.getY());
+    if(tspans.size() > 1)
+    {
+        // it runs off the right and carries on from the left
+        g.setFont(Fonts::Mono(14.f));
+        g.drawText(juce::String::fromUTF8("\xe2\x86\x92"), juce::Rectangle<float>(wave.getRight() - 16.f, mid - 9.f, 16.f, 18.f), juce::Justification::centred);
+        g.drawText(juce::String::fromUTF8("\xe2\x86\x92"), juce::Rectangle<float>(wave.getX(), mid - 9.f, 16.f, 18.f), juce::Justification::centred);
+    }
+    const auto  tagFont = Fonts::Caps(10.f, true);
+    auto        tagW    = [&](const juce::String& t) { return TrackedWidth(tagFont, t, .6f) + 12.f; };
+    const auto  st = PosText(tgt, len), et = LenText(tgt, len);
+    const float sw = tagW(st), ew = tagW(et);
+    float       sx = xs, ex = xe - ew;
+    if(tspans.size() == 1 && sx + sw > ex) // too close: put them outside the window instead
+    {
+        sx = xs - sw;
+        ex = xe;
+    }
+    sx = juce::jlimit(box.getX(), box.getRight() - sw, sx);
+    ex = juce::jlimit(box.getX(), box.getRight() - ew, ex);
+    startTag_ = {sx, box.getY(), sw, kTagH};
+    endTag_   = {ex, box.getY(), ew, kTagH};
+    for(auto [r, t] : {std::pair{startTag_, st}, std::pair{endTag_, et}})
+    {
+        g.setColour(Accent());
+        g.fillRect(r);
+        g.setColour(Bg());
+        g.setFont(tagFont);
+        DrawTracked(g, t, r.withTrimmedLeft(6.f).withTrimmedTop(1.f), .6f, juce::Justification::centredLeft);
+    }
+
+    // playhead
+    const float px = XFor(looper.GetPosition() / (float)len);
+    g.setColour(Red());
+    g.fillRect(px - 1.f, lane.getY(), 2.f, lane.getHeight() + 1.f);
+}
+
+LoopStrip::Grab LoopStrip::GrabAt(juce::Point<float> p) const
+{
+    const auto&  looper = proc_.Looper();
+    const size_t len    = looper.GetLength();
+    if(len == 0 || looper.GetState() == TapeLooper::State::Recording || looper.GetState() == TapeLooper::State::Empty)
+        return Grab::None;
+    // the tags are the easiest thing to grab
+    if(startTag_.contains(p))
+        return Grab::Start;
+    if(endTag_.contains(p))
+        return Grab::End;
+    const auto  spans = Spans(Target(len), len);
+    const float xs = spans.front().getStart(), xe = spans.back().getEnd();
+    const float ds = std::abs(p.x - xs), de = std::abs(p.x - xe);
+    if(juce::jmin(ds, de) <= 8.f)
+        return ds <= de ? Grab::Start : Grab::End;
+    for(auto& r : spans)
+        if(r.contains(p.x))
+            return Grab::Body;
+    return Grab::None;
+}
+
+void LoopStrip::Set(const char* id, float value)
+{
+    if(auto* p = proc_.apvts.getParameter(id))
+        p->setValueNotifyingHost(value);
 }
 
 void LoopStrip::mouseMove(const juce::MouseEvent& e)
 {
-    setMouseCursor(HandleAt(e.position) != nullptr ? juce::MouseCursor::LeftRightResizeCursor
-                                                   : juce::MouseCursor::NormalCursor);
+    const auto grab = GrabAt(e.position);
+    setMouseCursor(grab == Grab::Body ? juce::MouseCursor::DraggingHandCursor
+                   : grab != Grab::None ? juce::MouseCursor::LeftRightResizeCursor
+                                        : juce::MouseCursor::NormalCursor);
 }
 
 void LoopStrip::mouseDown(const juce::MouseEvent& e)
 {
-    dragging_   = HandleAt(e.position);
-    grabOffset_ = 0.f;
-    if(dragging_ != nullptr)
-    {
-        // keep the handle under the same spot of the mouse, so grabbing a tag doesn't make it jump
-        const size_t len = proc_.Looper().GetLength();
-        const auto [ws, we] = Window(len);
-        grabOffset_ = XFor((dragging_ == ids::loopStart ? ws : we) / (float)len) - e.position.x;
-    }
-    else
-        dragging_ = ids::loopScrub; // anywhere else scrubs (while stopped)
-    if(auto* p = proc_.apvts.getParameter(dragging_))
-    {
-        p->beginChangeGesture();
-        if(dragging_ == ids::loopScrub)
-            p->setValueNotifyingHost(FracAt(e.position.x));
-    }
+    auto& st  = proc_.apvts;
+    grab_     = GrabAt(e.position);
+    downFrac_ = FracAt(e.position.x);
+    pos0_     = st.getRawParameterValue(ids::loopPos)->load();
+    len0_     = st.getRawParameterValue(ids::loopLen)->load();
+    scrubbing_ = grab_ == Grab::None;
+    for(auto* id : scrubbing_ ? std::initializer_list<const char*>{ids::loopScrub} : std::initializer_list<const char*>{ids::loopPos, ids::loopLen})
+        if(auto* p = st.getParameter(id))
+            p->beginChangeGesture();
+    if(scrubbing_)
+        Set(ids::loopScrub, downFrac_); // anywhere outside the window scrubs (while stopped)
 }
 
 void LoopStrip::mouseDrag(const juce::MouseEvent& e)
 {
-    if(dragging_ != nullptr)
-        if(auto* p = proc_.apvts.getParameter(dragging_))
+    const float f  = FracAt(e.position.x);
+    const float dx = f - downFrac_;
+    auto wrap = [](float x) { return x - std::floor(x); };
+    constexpr float kMinLen = .01f;
+    switch(grab_)
+    {
+        case Grab::Body: Set(ids::loopPos, wrap(pos0_ + dx)); break;
+        case Grab::Start:
         {
-            p->setValueNotifyingHost(FracAt(e.position.x + grabOffset_));
-            repaint();
+            // the end stays where it is; the window may wrap
+            const float end    = pos0_ + len0_;
+            const float newPos = wrap(pos0_ + dx);
+            float       length = end - newPos;
+            length             = length - std::floor(length - kMinLen); // into (kMinLen, 1 + kMinLen]
+            Set(ids::loopPos, newPos);
+            Set(ids::loopLen, juce::jlimit(kMinLen, 1.f, length));
+            break;
         }
+        case Grab::End: Set(ids::loopLen, juce::jlimit(kMinLen, 1.f, len0_ + dx)); break;
+        case Grab::None:
+            if(scrubbing_)
+                Set(ids::loopScrub, f);
+            break;
+    }
+    repaint();
 }
 
 void LoopStrip::mouseUp(const juce::MouseEvent&)
 {
-    if(dragging_ != nullptr)
-        if(auto* p = proc_.apvts.getParameter(dragging_))
+    for(auto* id : scrubbing_ ? std::initializer_list<const char*>{ids::loopScrub} : std::initializer_list<const char*>{ids::loopPos, ids::loopLen})
+        if(auto* p = proc_.apvts.getParameter(id))
             p->endChangeGesture();
-    dragging_ = nullptr;
+    grab_      = Grab::None;
+    scrubbing_ = false;
+}
+
+void LoopStrip::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    // double-click the window: back to the whole tape
+    if(GrabAt(e.position) == Grab::None)
+        return;
+    for(auto [id, v] : {std::pair{ids::loopPos, 0.f}, std::pair{ids::loopLen, 1.f}})
+        if(auto* p = proc_.apvts.getParameter(id))
+        {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost(v);
+            p->endChangeGesture();
+        }
+    repaint();
 }
 
 // ---------------------------------------------------------------- editor
@@ -1488,7 +1840,8 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
     {
         auto freeSp = s.getRawParameterValue(ids::loopSpeed), stepsOn = s.getRawParameterValue(ids::loopSpeedSteps),
              step = s.getRawParameterValue(ids::loopSpeedStep);
-        auto revP = s.getRawParameterValue(ids::loopReverse);
+        auto revP = s.getRawParameterValue(ids::loopReverse), wander = s.getRawParameterValue(ids::loopWander),
+             movesP = s.getRawParameterValue(ids::loopMoves);
         PrismProcessor* proc = &p;
         looper_->SetHeaderNote([=] {
             const float sp = stepsOn->load() > .5f
@@ -1498,6 +1851,8 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
             juce::String n   = juce::String(sp, sp < 1.f ? 2 : 1) + "x";
             if(revP->load() > .5f)
                 n << dot << "rev";
+            if(wander->load() > 0.f)
+                n << dot << juce::String(kLoopMoves[juce::jlimit(0, 2, (int)movesP->load())]).toLowerCase();
             const auto& lp = proc->Looper();
             if(lp.GetState() == TapeLooper::State::Recording)
                 n << dot << "rec";
@@ -1517,24 +1872,29 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
     loopStrip_ = &keep(std::make_unique<LoopStrip>(p));
     looper_->AddFlexible(*loopStrip_, 120);
     looper_->NewLine(92);
-    // start and end are set on the waveform; they're still parameters for automation
+    // position and length are set on the waveform; they are still parameters for automation
     swaps_.push_back(&keep(std::make_unique<SwapKnob>(s, ids::loopSpeedSteps, ids::loopSpeed, ids::loopSpeedStep, "Speed")));
     looper_->AddKnob(*swaps_.back());
     looper_->AddKnob(knob(ids::loopGlide, "Glide"));
     looper_->AddKnob(knob(ids::loopDub, "Dub keep"));
     looper_->AddKnob(knob(ids::loopLevel, "Level"));
+    looper_->AddKnob(knob(ids::loopWander, "Wander"));
     {
         std::vector<juce::Component*> combos;
-        for(auto [id, label] : {std::pair{ids::loopSnap, "Snap points"}, std::pair{ids::loopLength, "Rec length"},
+        for(auto [id, label] : {std::pair{ids::loopSnap, "Snap"}, std::pair{ids::loopLength, "Rec length"},
                                 std::pair{ids::loopQuantize, "Quantize"}})
-            combos.push_back(&keep(std::make_unique<UnderlineCombo>(&s, id, label, true)));
-        looper_->AddFlexible(keep(std::make_unique<Column>(combos, 28, 4, true)), 220);
+            combos.push_back(&keep(std::make_unique<UnderlineCombo>(&s, id, label)));
+        moves_ = &keep(std::make_unique<MovesMenu>(s));
+        combos.push_back(moves_);
+        looper_->AddFlexible(keep(std::make_unique<Grid>(combos, 2, 42, 12, 8, true)), 250);
 
         auto& steps = toggle(ids::loopSpeedSteps, "Oct / 5th");
         auto& save  = toggle(ids::loopSave, "Save loop");
-        save.setTooltip("Store the loop's audio in the project");
-        const int pw = juce::jmax(steps.NaturalWidth(), save.NaturalWidth());
-        looper_->AddFixed(keep(std::make_unique<Column>(std::vector<juce::Component*>{&steps, &save}, 28, 6)), pw);
+        save.setTooltip("On: the loop's audio is saved inside the project when the DAW saves, so it's there when you reopen it. "
+                        "Off: only the settings are saved.");
+        loopDrag_    = &keep(std::make_unique<LoopDrag>(p));
+        const int pw = juce::jmax(steps.NaturalWidth(), save.NaturalWidth(), loopDrag_->NaturalWidth());
+        looper_->AddFixed(keep(std::make_unique<Column>(std::vector<juce::Component*>{&steps, &save, loopDrag_}, 28, 4)), pw);
     }
 
     // ---- diagrams beside the titles, following each effect's controls
@@ -1736,8 +2096,12 @@ void PrismEditor::timerCallback()
     const bool playing = state == TapeLooper::State::Playing;
     if(play_->getButtonText() != (playing ? "Stop" : "Play"))
         play_->setButtonText(playing ? "Stop" : "Play");
-    if(state != TapeLooper::State::Empty || proc_.LooperWaiting())
+    // keep drawing while there's a loop, and once more when it changes state (so a clear shows straight away)
+    const bool waiting = proc_.LooperWaiting();
+    if(state != TapeLooper::State::Empty || waiting || state != lastLoopState_ || waiting != lastWaiting_)
         loopStrip_->repaint();
+    lastLoopState_ = state;
+    lastWaiting_   = waiting;
 
     // the pattern hint only makes sense in free mode
     for(auto* c : glitch_->getChildren())
@@ -1756,6 +2120,8 @@ void PrismEditor::timerCallback()
     for(auto* m : {glitch_.get(), looper_.get()})
         m->repaint(0, 0, m->getWidth(), kModPadTop + kModHeaderH);
     stepLane_->Poll();
+    loopDrag_->Poll();
+    moves_->Poll();
     chain_->Sync();
     Renumber();
 

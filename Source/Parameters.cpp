@@ -173,9 +173,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout CreateParameterLayout()
             names.add(n);
         layout.add(std::make_unique<APC>(Id(ids::loopSpeedStep), "Loop Speed Step", names, 4));
     }
-    layout.add(Knob(ids::loopStart, "Loop Start", 0.f));
-    layout.add(Knob(ids::loopEnd, "Loop End", 1.f));
+    layout.add(Knob(ids::loopPos, "Loop Position", 0.f));
+    layout.add(Knob(ids::loopLen, "Loop Length", 1.f));
     layout.add(std::make_unique<APC>(Id(ids::loopSnap), "Loop Point Snap", Names(kLoopSnaps), 0));
+    layout.add(Knob(ids::loopWander, "Loop Wander", 0.f));
+    layout.add(std::make_unique<APC>(Id(ids::loopMoves), "Loop Movement", juce::StringArray(kLoopMoves, 3), 0));
+    layout.add(std::make_unique<APC>(Id(ids::loopEvery), "Loop Movement Every", juce::StringArray(kLoopEveryNames, 4), 0));
+    layout.add(std::make_unique<juce::AudioParameterInt>(Id(ids::loopSeed), "Loop Movement Seed", 1, 999, 1));
+    layout.add(std::make_unique<APC>(Id(ids::loopLand), "Loop Changes Land", juce::StringArray{"End of pass", "Right away"}, 0));
 
     return layout;
 }

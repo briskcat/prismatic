@@ -272,20 +272,95 @@ class LoopStrip : public juce::Component
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
+    void mouseDoubleClick(const juce::MouseEvent&) override;
+
+    /** A loop window on the tape, in samples. It may wrap past the end. */
+    struct Win
+    {
+        size_t start = 0, length = 0;
+        bool   operator==(const Win& o) const { return start == o.start && length == o.length; }
+        bool   operator!=(const Win& o) const { return !(*this == o); }
+    };
 
   private:
+    enum class Grab
+    {
+        None,
+        Start, // the left edge: end stays put
+        End,   // the right edge: length changes
+        Body   // inside: slide the whole window
+    };
     juce::Rectangle<float> Box() const;
     juce::Rectangle<float> Wave() const;
     void                   DrawRuler(juce::Graphics&, juce::Rectangle<float> ruler, size_t len) const;
+    /** The window as set (position and length, plus how far wander has moved it): where the handles go */
+    Win                    Target(size_t len) const;
+    /** The window playing now */
+    Win                    Current(size_t len) const;
+    /** One or two spans (when it wraps) covering a window, in x */
+    std::vector<juce::Range<float>> Spans(Win, size_t len) const;
+    juce::String           PosText(Win, size_t len) const;
+    juce::String           LenText(Win, size_t len) const;
     float                  XFor(float frac) const;
     float                  FracAt(float x) const;
-    const char*            HandleAt(juce::Point<float>) const;
-    /** Where the start and end handles are, in samples, from the parameters (not the audio thread) */
-    std::pair<size_t, size_t> Window(size_t len) const;
+    Grab                   GrabAt(juce::Point<float>) const;
+    void                   Set(const char* id, float value);
+
     PrismProcessor&        proc_;
-    const char*            dragging_   = nullptr;
-    float                  grabOffset_ = 0.f; // grabbed a tag: keep the handle where it was relative to the mouse
+    Grab                   grab_ = Grab::None;
+    bool                   scrubbing_ = false;
+    float                  downFrac_ = 0.f, pos0_ = 0.f, len0_ = 1.f; // at mouse down
     juce::Rectangle<float> startTag_, endTag_;
+};
+
+/** A pill you drag out of the plug-in: drops the looping part of the tape into the DAW as a WAV file */
+class LoopDrag : public juce::Component, public juce::SettableTooltipClient
+{
+  public:
+    explicit LoopDrag(PrismProcessor&);
+    void paint(juce::Graphics&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
+    void Poll();
+    int  NaturalWidth() const;
+    /** Writes the looping part of the tape to a temporary WAV and returns it (empty if there's no loop) */
+    juce::File WriteLoop() const;
+
+  private:
+    bool       HasLoop() const;
+    PrismProcessor& proc_;
+    bool            dragging_ = false, had_ = false;
+};
+
+/** The looper's movement: one dropdown for how the window wanders, how often, when changes land, and a new seed.
+    Looks like an UnderlineCombo; the menu ticks one item in each section. */
+class MovesMenu : public juce::Component
+{
+  public:
+    explicit MovesMenu(APVTS&);
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void Poll();
+
+  private:
+    juce::String Text() const;
+    void         Set(const char* id, float plain);
+    APVTS&       apvts_;
+    juce::String last_;
+};
+
+/** Controls in a grid, filled row by row; each cell the same size. Optionally a hairline on the left. */
+class Grid : public juce::Component
+{
+  public:
+    Grid(std::vector<juce::Component*> items, int cols, int rowH, int gapX, int gapY, bool rule = false);
+    void resized() override;
+    void paint(juce::Graphics&) override;
+
+  private:
+    std::vector<juce::Component*> items_;
+    int                           cols_, rowH_, gapX_, gapY_;
+    bool                          rule_;
 };
 
 /** Controls stacked top to bottom, each a fixed height, centred as a group. Optionally a hairline on the left. */
@@ -364,12 +439,16 @@ class PrismEditor : public juce::AudioProcessorEditor,
     prism::ui::Pill *                 rec_ = nullptr, *play_ = nullptr;
     prism::ui::StepLane*              stepLane_  = nullptr;
     prism::ui::LoopStrip*             loopStrip_ = nullptr;
+    prism::ui::LoopDrag*              loopDrag_  = nullptr;
+    prism::ui::MovesMenu*             moves_     = nullptr;
     juce::Rectangle<int>              row1_, row2_;
 
     std::unique_ptr<juce::ComponentBoundsConstrainer> snap_;
     std::atomic<int>                        touched_{-1};
     juce::StringArray                       paramIds_;
     int                                     blink_ = 0;
+    prism::TapeLooper::State                lastLoopState_ = prism::TapeLooper::State::Empty;
+    bool                                    lastWaiting_   = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PrismEditor)
 };

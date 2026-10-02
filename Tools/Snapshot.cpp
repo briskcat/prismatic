@@ -66,6 +66,24 @@ int main(int argc, char** argv)
             proc.apvts.state.setProperty("uiTheme", "cream", nullptr);
     std::unique_ptr<juce::AudioProcessorEditor> editor(proc.createEditor());
     juce::ignoreUnused(editor);
+    // --export: write the drag-out WAV and print where it went
+    for(int i = 2; i < argc; ++i)
+        if(juce::String(argv[i]) == "--export")
+        {
+            std::function<prism::ui::LoopDrag*(juce::Component*)> find = [&](juce::Component* c) -> prism::ui::LoopDrag* {
+                if(auto* d = dynamic_cast<prism::ui::LoopDrag*>(c))
+                    return d;
+                for(auto* ch : c->getChildren())
+                    if(auto* f = find(ch))
+                        return f;
+                return nullptr;
+            };
+            if(auto* d = find(editor.get()))
+            {
+                const auto f = d->WriteLoop();
+                std::printf("exported %s (%lld bytes)\n", f.getFullPathName().toRawUTF8(), (long long)f.getSize());
+            }
+        }
     // --drag=x0,x1: drag on the loop waveform from x0 to x1 (strip coordinates), to test the handles
     for(int i = 2; i < argc; ++i)
         if(juce::String(argv[i]).startsWith("--drag="))
@@ -87,13 +105,13 @@ int main(int argc, char** argv)
                     return juce::MouseEvent(src, pt, juce::ModifierKeys::leftButtonModifier, 0.f, 0.f, 0.f, 0.f, 0.f, strip, strip,
                                             juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, drag);
                 };
-                std::printf("strip %d wide; start %.3f end %.3f\n", strip->getWidth(),
-                            proc.apvts.getRawParameterValue("loop_start")->load(), proc.apvts.getRawParameterValue("loop_end")->load());
+                std::printf("strip %d wide; pos %.3f len %.3f\n", strip->getWidth(),
+                            proc.apvts.getRawParameterValue("loop_pos")->load(), proc.apvts.getRawParameterValue("loop_len")->load());
                 strip->mouseDown(ev(xs[0].getFloatValue(), false));
                 strip->mouseDrag(ev(xs[1].getFloatValue(), true));
                 strip->mouseUp(ev(xs[1].getFloatValue(), true));
-                std::printf("after drag: start %.3f end %.3f\n", proc.apvts.getRawParameterValue("loop_start")->load(),
-                            proc.apvts.getRawParameterValue("loop_end")->load());
+                std::printf("after drag: pos %.3f len %.3f\n", proc.apvts.getRawParameterValue("loop_pos")->load(),
+                            proc.apvts.getRawParameterValue("loop_len")->load());
             }
         }
     const auto image = editor->createComponentSnapshot(editor->getLocalBounds(), true, 2.f);

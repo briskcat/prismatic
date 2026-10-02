@@ -195,6 +195,7 @@ void PrismProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBu
                 bpm_ = static_cast<float>(*bpm);
             if(auto sig = pos->getTimeSignature())
                 beatsPerBar_ = juce::jmax(1, sig->numerator);
+            hostPlaying_ = pos->getIsPlaying();
             if(pos->getIsPlaying())
                 if(auto ppq = pos->getPpqPosition())
                     beat_ = *ppq;
@@ -232,9 +233,18 @@ void PrismProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBu
     // loop window, optionally snapped to note values counted from the loop's start
     if(const size_t loopLen = looper.AudioLength(); loopLen > 0 && looper.AudioState() != TapeLooper::State::Recording)
     {
-        const auto [start, end] = LoopWindow(loopLen, LoopSnapUnit(), Raw(ids::loopStart), Raw(ids::loopEnd));
-        looper.SetWindow(start, end);
+        const double snap          = LoopSnapUnit();
+        const auto [start, length] = LoopWindow(loopLen, snap, Raw(ids::loopPos), Raw(ids::loopLen));
+        looper.SetWindow(start, length);
+        const int    everyIdx = juce::jlimit(0, (int)std::size(kLoopEveryBars) - 1, (int)Raw(ids::loopEvery));
+        const double every    = kLoopEveryBars[everyIdx] * beatsPerBar_ * 60.0 / bpm_ * sampleRate_;
+        looper.SetMoves(Raw(ids::loopWander), static_cast<TapeLooper::Moves>(juce::jlimit(0, 2, (int)Raw(ids::loopMoves))), every,
+                        static_cast<uint32_t>(Raw(ids::loopSeed)), snap, (int)Raw(ids::loopLand) == 0);
     }
+    // the wander path starts over with the song, so the same seed lands in the same places every playback
+    if(hostPlaying_ && !wasHostPlaying_)
+        looper.RestartMoves();
+    wasHostPlaying_ = hostPlaying_;
 
     float* l = buffer.getWritePointer(0);
     float* r = buffer.getWritePointer(1);
@@ -402,19 +412,20 @@ juce::AudioProcessorEditor* PrismProcessor::createEditor() { return new PrismEdi
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new PrismProcessor(); }
 
-std::pair<size_t, size_t> PrismProcessor::LoopWindow(size_t loopLen, double unitLen, float startFrac, float endFrac)
+std::pair<size_t, size_t> PrismProcessor::LoopWindow(size_t loopLen, double unitLen, float posFrac, float lenFrac)
 {
-    auto point = [&](float frac) {
-        double s = frac * (double)loopLen;
-        if(unitLen > 0.0)
-            s = std::round(s / unitLen) * unitLen;
-        return static_cast<size_t>(juce::jlimit(0.0, (double)loopLen, s));
-    };
-    const size_t start = point(startFrac);
-    size_t       end   = point(endFrac);
-    if(end <= start) // keep at least one snap unit (or a little audio) between them
-        end = std::min(loopLen, start + (unitLen > 0.0 ? static_cast<size_t>(unitLen) : 64));
-    return {start, end};
+    if(loopLen == 0)
+        return {0, 0};
+    const double tape  = (double)loopLen;
+    double       start = posFrac * tape, length = lenFrac * tape;
+    if(unitLen > 0.0 && unitLen < tape)
+    {
+        start  = std::round(start / unitLen) * unitLen;
+        length = juce::jmax(unitLen, std::round(length / unitLen) * unitLen); // at least one snap unit
+    }
+    length = juce::jlimit(juce::jmin(64.0, tape), tape, length);
+    start  = std::fmod(start, tape);
+    return {static_cast<size_t>(start), static_cast<size_t>(length)};
 }
 
 double PrismProcessor::LoopSnapUnit() const

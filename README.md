@@ -120,14 +120,37 @@ The loop behaves like a tape loop:
   half speed plays back an octave up at normal speed.
 - **Dub Keep** sets how much of the existing loop survives each overdub pass.
 - **Scrub**: while stopped, click or drag the waveform to move the tape.
-- **Start / End** set which part of the tape loops: drag a handle's line or its
-  tag on the waveform. They're also parameters, so the
-  DAW can automate them. Playback and overdubs stay inside that window, and the
-  audio outside it is kept.
-- **Snap points** (1/16, 1/8, 1/4, 1 bar) snap Start and End to note values,
-  counted from where the recording began. Dotted lines inside the loop show the
-  snap positions, and a ruler under the waveform counts bars and beats. Free
-  lets them move anywhere.
+- **Position / Length** set which part of the tape loops. Playback and
+  overdubs stay inside that window, and the audio outside it is kept.
+  - Drag inside the window to slide it (the length stays put), or drag an edge
+    or its tag to resize it. Double-click the window to go back to the whole
+    tape.
+  - The window **wraps**: slide it past the end of the tape and it carries on
+    from the start, like a real tape loop.
+  - Both are parameters, so a DAW LFO can move the loop around the tape.
+  - The tags show where it is: bar.beat.sixteenth and a length in bars or beats
+    when snapping, a percentage and seconds when free.
+- **Snap** (1/16, 1/8, 1/4, 1 bar) snaps Position and Length to note values,
+  counted from where the recording began, so the loop stays in time. Dotted
+  lines inside the loop show the snap positions, and a ruler under the waveform
+  counts bars and beats. Free lets them move anywhere.
+- **Changes land at the end of a pass** by default: a new position or length
+  waits until the current pass finishes, so every pass is whole and in time. A
+  dashed outline marked "next pass" shows where it's going. Set "right away" in
+  the Movement menu for instant jumps, which crossfade.
+- **Wander** moves the window on its own, at the end of a pass:
+  - The **Wander** knob sets how far. At 0% the loop stays put, and Movement
+    reads Off.
+  - **Movement** picks how: **drift** takes small random steps from where it is,
+    **random** jumps anywhere within range ahead of the set position, and
+    **scan** creeps forward a step each time. Wander sets the largest step
+    (drift), the range (random, 100% = anywhere), or the step size (scan, 100% =
+    a whole window).
+  - **How often**: each pass, or every 1, 2 or 4 bars.
+  - **New seed** picks a different path. The path starts over when the DAW
+    starts playing, so the same seed takes the same path every playback.
+  - With Snap on, every move lands on the snap grid.
+  - Faint marks under the ruler show where the window was on the last few passes.
 
 | Button | Does |
 |---|---|
@@ -139,7 +162,13 @@ The loop behaves like a tape loop:
   The REC button blinks while a press is waiting.
 - **Length** (1 to 8 bars) stops the first recording automatically at exactly
   that length, so the loop stays in time with the song.
-- **Save Loop** stores the loop audio in the project, as 24-bit FLAC.
+- **Save Loop**: when the DAW saves the project, the loop's audio is stored in
+  it (as 24-bit FLAC), so the loop is still there when you reopen it. Off saves
+  only the settings. Clicking it changes nothing you can hear.
+- **Drag Loop**: drag it onto an audio track in Ableton or Logic to drop in the
+  part that's playing (the loop window, joined up if it wraps) as a 24-bit WAV. It's the audio
+  as it sits on the tape, before speed and reverse. The files are kept in
+  `~/Music/Prism FX/Loops`.
 - **Length limit**: loops can be up to 2 minutes long.
 - **MIDI mapping**: REC, PLAY and CLEAR are momentary parameters, so they can be
   MIDI-mapped in the DAW.

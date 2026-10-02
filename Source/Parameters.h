@@ -73,9 +73,14 @@ inline constexpr const char* loopQuantize   = "loop_quantize";
 inline constexpr const char* loopLength     = "loop_length";
 inline constexpr const char* loopSave       = "loop_save";
 inline constexpr const char* loopSpeedStep  = "loop_speed_step";
-inline constexpr const char* loopStart      = "loop_start";
-inline constexpr const char* loopEnd        = "loop_end";
+inline constexpr const char* loopPos        = "loop_pos";    // where the loop window starts on the tape (0-1)
+inline constexpr const char* loopLen        = "loop_len";    // how long it is (0-1 of the tape)
 inline constexpr const char* loopSnap       = "loop_snap";
+inline constexpr const char* loopWander     = "loop_wander"; // how far the window moves on its own
+inline constexpr const char* loopMoves      = "loop_moves";  // drift, random, scan
+inline constexpr const char* loopEvery      = "loop_every";  // each pass, every 1/2/4 bars
+inline constexpr const char* loopSeed       = "loop_seed";
+inline constexpr const char* loopLand       = "loop_land";   // changes land at the end of a pass, or right away
 } // namespace prism::ids
 
 namespace prism
@@ -104,7 +109,12 @@ inline constexpr int   kLoopBars[]      = {0, 1, 2, 4, 8};
 inline constexpr float kSpeedSteps[]    = {.25f, 1.f / 3.f, .5f, 2.f / 3.f, 1.f, 1.5f, 2.f};
 inline constexpr const char* kSpeedStepNames[] = {"1/4x  -2 oct", "1/3x  -oct-5th", "1/2x  -1 oct", "2/3x  -5th",
                                                   "1x", "3/2x  +5th", "2x  +1 oct"};
-/** Loop start/end snapping, in beats (0 = free) */
+/** How the loop window wanders, and how often (in bars; 0 = each pass) */
+inline constexpr const char* kLoopMoves[]      = {"Drift", "Random", "Scan"};
+inline constexpr const char* kLoopMoveHints[]  = {"small steps", "jumps", "creeps forward"};
+inline constexpr int         kLoopEveryBars[]  = {0, 1, 2, 4};
+inline constexpr const char* kLoopEveryNames[] = {"each pass", "every bar", "every 2 bars", "every 4 bars"};
+/** Loop position/length snapping, in beats (0 = free) */
 inline constexpr NoteDiv kLoopSnaps[] = {{"Free", 0.f}, {"1/16", .25f}, {"1/8", .5f}, {"1/4", 1.f}, {"1 bar", 4.f}};
 
 juce::AudioProcessorValueTreeState::ParameterLayout CreateParameterLayout();

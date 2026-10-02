@@ -44,9 +44,10 @@ class PrismProcessor : public juce::AudioProcessor
     double SampleRate() const { return sampleRate_; }
     std::atomic<float> uiBpm{120.f};
 
-    /** The loop window in samples for start/end (0-1), snapped to unitLen samples when it's above 0.
+    /** The loop window for position and length (0-1 of the tape): where it starts and how long it is, in
+        samples, snapped to unitLen samples when that's above 0. It may wrap past the end of the tape.
         Shared by the audio thread and the waveform, so the handles show exactly where the loop will be. */
-    static std::pair<size_t, size_t> LoopWindow(size_t loopLen, double unitLen, float startFrac, float endFrac);
+    static std::pair<size_t, size_t> LoopWindow(size_t loopLen, double unitLen, float posFrac, float lenFrac);
     /** Snap length in samples for the current snap setting, tempo and sample rate (0 = free) */
     double LoopSnapUnit() const;
     /** Which glitch step (dice roll) is playing, within its pattern; for the UI's step lane */
@@ -80,6 +81,7 @@ class PrismProcessor : public juce::AudioProcessor
     double  beat_        = 0.0;
     float   bpm_         = 120.f;
     int     beatsPerBar_ = 4;
+    bool    hostPlaying_ = false, wasHostPlaying_ = false;
     int64_t lastEdge_    = -1;
     int64_t lastPulse_   = -1;
 
