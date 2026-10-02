@@ -34,5 +34,5 @@ cp NOTICE.md TRADEMARKS.md "$stage/Licenses/"
 cp Assets/fonts/OFL-*.txt "$stage/Licenses/"
 
 zip_name="Prism-FX-$version-macOS.zip"
-(cd dist && rm -f "$zip_name" && ditto -c -k --sequesterRsrc --keepParent "Prism FX $version" "$zip_name")
+(cd dist && rm -f "$zip_name" && ditto -c -k --norsrc --noextattr --keepParent "Prism FX $version" "$zip_name")
 echo "dist/$zip_name"
