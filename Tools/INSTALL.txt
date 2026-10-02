@@ -23,4 +23,5 @@ Install
 
 Prism FX shows up under the manufacturer "Prismatic".
 
-Source and docs: https://github.com/CHOMPI-Club/CHOMPI (the plugin folder).
+Prism FX is free and open source (GNU AGPLv3); see the Licenses folder.
+Source code and docs: REPO_URL

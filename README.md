@@ -5,7 +5,8 @@
 ![Prism FX, cream theme](screenshot-cream.png)
 
 An AU / VST3 effect plug-in built from the CHOMPI firmware's effects and tape
-looper. Every control is a knob or button: the hardware's shift functions and
+looper. It's free and open source (AGPLv3). Prism FX is an independent project,
+not made or endorsed by CHOMPI Club or Chase Bliss. Every control is a knob or button: the hardware's shift functions and
 one-knob macros are split out into separate controls.
 
 ## Download and install (macOS)
@@ -260,3 +261,18 @@ The plug-in name is set in one place: `PLUGIN_NAME` in `CMakeLists.txt`. The
 AU/VST3 identity (manufacturer `Prsm`, plug-in `Pfx1`) is separate. Don't
 change it after people have saved projects with the plug-in, or the DAW won't
 find it in those projects.
+
+## License
+
+Prism FX is free software under the **GNU Affero General Public License v3**
+(`LICENSE`). You can use, modify and share it, and even sell it. Anyone who
+distributes it, or a modified version, has to make their full source available
+under the same license, so improvements stay open.
+
+- The effects are ported from the CHOMPI firmware, with DSP from Electrosmith's
+  DaisySP and Mutable Instruments, all under the MIT license. Their notices are
+  in `NOTICE.md`.
+- JUCE is used under its AGPLv3 license.
+- The fonts are under the SIL Open Font License (`Assets/fonts/`).
+- The names "Prism FX" and "Prismatic" aren't covered by the code license. If you
+  share a modified version, give it its own name (see `TRADEMARKS.md`).
