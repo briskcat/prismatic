@@ -27,11 +27,11 @@ title on its card. Switching crossfades so it never clicks. Input, Dry/Wet, Outp
 Squash is the output compressor; turn it on with its block at the end of the
 chain.
 
-**Layout:** filter, drive, tape and crush on the first row; delay and reverb on
-the second; glitch delay and the tape looper side by side at the bottom. Each
-of those two stacks its controls in three rows. Switches that belong to a
-whole effect (sync, varispeed, freeze, oct/5th, save loop) sit in its card's
-header.
+**Layout:** filter, drive, tape, crush, delay and reverb across the top row;
+glitch delay and the tape looper side by side underneath. Switches that belong
+to a whole effect (sync, varispeed, freeze) sit in its card's header. The
+looper's header holds its transport (rec, play, clear, reverse), so the
+waveform can take the full width below.
 
 **Look:** indie editorial: one ink on a flat ground, hairline rules, Instrument
 Serif with DM Mono caps, outlined pills.
@@ -76,7 +76,8 @@ Serif with DM Mono caps, outlined pills.
   - Delay: echoes spaced by the time and fading with the feedback, bouncing
     left and right.
   - Reverb: the tail's length, density and tone, and freeze.
-  - Looper: tape direction and speed.
+  - Looper: dub keep, as stacked overdub passes that fade as they get older
+    (the newest turns red while recording or overdubbing).
 
 ### Signal flow
 
@@ -119,12 +120,14 @@ The loop behaves like a tape loop:
   half speed plays back an octave up at normal speed.
 - **Dub Keep** sets how much of the existing loop survives each overdub pass.
 - **Scrub**: while stopped, click or drag the waveform to move the tape.
-- **Start / End** set which part of the tape loops. Set them with the knobs or
-  by dragging the handles on the waveform. Playback and overdubs stay inside
-  that window, and the audio outside it is kept.
+- **Start / End** set which part of the tape loops: drag a handle's line or its
+  tag on the waveform. They're also parameters, so the
+  DAW can automate them. Playback and overdubs stay inside that window, and the
+  audio outside it is kept.
 - **Snap points** (1/16, 1/8, 1/4, 1 bar) snap Start and End to note values,
-  counted from where the recording began. A faint grid on the waveform shows
-  the snap positions. Free lets them move anywhere.
+  counted from where the recording began. Dotted lines inside the loop show the
+  snap positions, and a ruler under the waveform counts bars and beats. Free
+  lets them move anywhere.
 
 | Button | Does |
 |---|---|

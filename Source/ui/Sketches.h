@@ -350,95 +350,20 @@ struct DeckState
     int   recBars = 0, quantize = 0, stepIdx = 4;
 };
 
-// looper: a little tape deck. Reels show where the tape is, a red light shows recording, arrows and a ramp
-// show speed, direction and glide, and stacked layers show how much each overdub pass keeps.
+// looper: dub keep as stacked overdub passes, newest on top. Older passes fade unless dub keep is high,
+// and the newest turns red while recording or overdubbing.
 inline void Deck(juce::Graphics& g, R r, const DeckState& d)
 {
-    auto plot = r.withTrimmedBottom(1.f);
-
-    // cassette: tape moves from the left reel to the right as the loop plays
-    auto box = plot.withWidth(juce::jmin(plot.getWidth() * .4f, plot.getHeight() * 1.9f));
-    juce::Path body;
-    body.addRoundedRectangle(box, 2.5f);
-    Pen(g, body, 1.5f);
-    const float maxR = box.getHeight() * .32f, hubR = maxR * .32f;
-    const float done = d.hasLoop ? d.pos : 0.f;
-    for(int k = 0; k < 2; ++k)
+    const auto plot = r.withTrimmedBottom(1.f).withWidth(juce::jmin(r.getWidth(), 40.f));
+    for(int k = 0; k < 4; ++k)
     {
-        const juce::Point<float> c(box.getX() + box.getWidth() * (k == 0 ? .3f : .7f), box.getCentreY() - 1.f);
-        const float pack = hubR + (maxR - hubR) * (k == 0 ? 1.f - done : done);
-        if(d.hasLoop)
-        {
-            g.setColour(Ink().withAlpha(.18f + .3f * d.level));
-            g.fillEllipse(c.x - pack, c.y - pack, pack * 2.f, pack * 2.f);
-        }
-        juce::Path reel;
-        reel.addEllipse(c.x - hubR, c.y - hubR, hubR * 2.f, hubR * 2.f);
-        for(int sp = 0; sp < 3; ++sp)
-        {
-            const float a = sp * kTwoPi / 3.f;
-            reel.startNewSubPath(c.x, c.y);
-            reel.lineTo(c.x + hubR * std::sin(a), c.y - hubR * std::cos(a));
-        }
-        Pen(g, reel, 1.2f);
+        juce::Path  layer;
+        const float ly = plot.getY() + 3.f + k * (plot.getHeight() - 6.f) / 3.f;
+        layer.startNewSubPath(plot.getX(), ly);
+        layer.lineTo(plot.getRight(), ly);
+        const auto ink = k == 0 && (d.recording || d.dubbing) ? Red() : Ink();
+        Pen(g, layer, 2.2f, ink.withAlpha(juce::jmax(.08f, std::pow(d.dub, (float)k * 1.5f))));
     }
-    // the record light
-    if(d.recording || d.dubbing)
-    {
-        g.setColour(Red());
-        g.fillEllipse(box.getRight() - 9.f, box.getY() + 3.f, 6.f, 6.f);
-    }
-
-    // speed ramp: how the tape gets up to speed (steep = snappy, gentle = long glide); its height is the speed
-    auto  ramp   = plot.withTrimmedLeft(box.getWidth() + 10.f).withWidth(juce::jmin(42.f, plot.getWidth() * .22f));
-    const float level = juce::jlimit(.15f, 1.f, d.speed / 2.f);
-    const float tau   = .04f + d.glide * .9f;
-    const auto  shape = [&](float x) { return level * (1.f - std::exp(-x / tau)) / (1.f - std::exp(-1.f / tau)); };
-    Pen(g, Curve(ramp, 30,
-                        [&](float x) { return d.reverse ? shape(1.f - x) : shape(x); }), 1.6f);
-    juce::Path base;
-    base.startNewSubPath(ramp.getX(), ramp.getBottom());
-    base.lineTo(ramp.getRight(), ramp.getBottom());
-    Dashed(g, base, Faint(), 1.f);
-
-    // direction and speed: more arrows for faster tape
-    const int   arrows = d.speed < .45f ? 1 : d.speed < .9f ? 2 : d.speed < 1.4f ? 3 : 4;
-    const float dir    = d.reverse ? -1.f : 1.f;
-    const float ay     = plot.getCentreY();
-    float       x      = ramp.getRight() + 12.f;
-    for(int i = 0; i < arrows; ++i, x += 9.f)
-    {
-        juce::Path a;
-        a.startNewSubPath(x - 4.f * dir, ay - 6.f);
-        a.lineTo(x + 4.f * dir, ay);
-        a.lineTo(x - 4.f * dir, ay + 6.f);
-        Pen(g, a, 1.8f);
-    }
-
-    // dub keep: each overdub pass as a layer; the older ones fade unless dub keep is high
-    const float lx = x + 4.f;
-    if(lx + 18.f < plot.getRight())
-    {
-        for(int k = 0; k < 4; ++k)
-        {
-            juce::Path layer;
-            const float ly = plot.getY() + 4.f + k * (plot.getHeight() - 8.f) / 3.f;
-            layer.startNewSubPath(lx, ly);
-            layer.lineTo(juce::jmin(plot.getRight(), lx + 24.f), ly);
-            Pen(g, layer, 2.2f, Ink().withAlpha(juce::jmax(.08f, std::pow(d.dub, (float)k * 1.5f))));
-        }
-    }
-
-    // the note: speed (as an interval when snapped), direction, and how recording is timed
-    juce::String note = d.steps ? juce::String(kSpeedStepNames[juce::jlimit(0, (int)std::size(kSpeedStepNames) - 1, d.stepIdx)])
-                                : juce::String(d.speed, 2) + "x";
-    if(d.reverse)
-        note << " rev";
-    if(d.recBars > 0)
-        note << " . " << d.recBars << (d.recBars == 1 ? " bar" : " bars");
-    if(d.quantize > 0)
-        note << (d.quantize == 1 ? " . q beat" : " . q bar");
-    Note(g, r, note, juce::Justification::bottomLeft);
 }
 } // namespace sketch
 } // namespace prism::ui

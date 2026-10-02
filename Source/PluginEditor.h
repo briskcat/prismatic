@@ -92,13 +92,15 @@ class Pill : public juce::TextButton
 class UnderlineCombo : public juce::Component
 {
   public:
-    UnderlineCombo(APVTS*, const char* paramId, const juce::String& label);
+    /** inline: the label sits to the left of the value on one line, instead of above it */
+    UnderlineCombo(APVTS*, const char* paramId, const juce::String& label, bool inlineLabel = false);
     void resized() override;
     void paint(juce::Graphics&) override;
     juce::ComboBox box;
 
   private:
     juce::String                               label_;
+    bool                                       inline_ = false;
     std::unique_ptr<APVTS::ComboBoxAttachment> attach_;
 };
 
@@ -138,11 +140,8 @@ class Module : public juce::Component
     void AddHeader(juce::Component&, int width);
     void SetHeaderNote(std::function<juce::String()> note) { note_ = std::move(note); }
     void SetSketch(Sketch::Draw, Sketch::State);
-    void PollSketch()
-    {
-        if(sketch_)
-            sketch_->Poll();
-    }
+    /** Redraw the sketch if its inputs changed, and re-lay the header if the note changed length */
+    void PollSketch();
     void InvalidateSketch()
     {
         if(sketch_)
@@ -196,6 +195,7 @@ class Module : public juce::Component
     std::vector<Item>                             items_;
     std::vector<int>                              lineH_;
     std::function<juce::String()>                 note_;
+    juce::String                                  lastNote_;
     std::unique_ptr<Sketch>                       sketch_;
 };
 
@@ -274,12 +274,32 @@ class LoopStrip : public juce::Component
     void mouseMove(const juce::MouseEvent&) override;
 
   private:
+    juce::Rectangle<float> Box() const;
     juce::Rectangle<float> Wave() const;
+    void                   DrawRuler(juce::Graphics&, juce::Rectangle<float> ruler, size_t len) const;
     float                  XFor(float frac) const;
     float                  FracAt(float x) const;
-    const char*            HandleAt(float x) const;
+    const char*            HandleAt(juce::Point<float>) const;
+    /** Where the start and end handles are, in samples, from the parameters (not the audio thread) */
+    std::pair<size_t, size_t> Window(size_t len) const;
     PrismProcessor&        proc_;
-    const char*            dragging_ = nullptr;
+    const char*            dragging_   = nullptr;
+    float                  grabOffset_ = 0.f; // grabbed a tag: keep the handle where it was relative to the mouse
+    juce::Rectangle<float> startTag_, endTag_;
+};
+
+/** Controls stacked top to bottom, each a fixed height, centred as a group. Optionally a hairline on the left. */
+class Column : public juce::Component
+{
+  public:
+    Column(std::vector<juce::Component*> items, int itemH, int gap, bool rule = false);
+    void resized() override;
+    void paint(juce::Graphics&) override;
+
+  private:
+    std::vector<juce::Component*> items_;
+    int                           itemH_, gap_;
+    bool                          rule_;
 };
 
 /** Holds the UI at its logical size; the editor scales it to the window */
