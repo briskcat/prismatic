@@ -123,6 +123,7 @@ FxParams PrismProcessor::ReadParams(float bpm) const
     p.looper_glide   = Raw(ids::loopGlide);
     p.looper_dub     = Raw(ids::loopDub);
     p.looper_level   = Raw(ids::loopLevel);
+    p.looper_mix     = Raw(ids::loopMix);
     p.looper_scrub   = Raw(ids::loopScrub);
     return p;
 }

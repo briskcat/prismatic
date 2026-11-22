@@ -68,6 +68,7 @@ inline constexpr const char* loopReverse    = "loop_reverse";
 inline constexpr const char* loopGlide      = "loop_glide";
 inline constexpr const char* loopDub        = "loop_dub";
 inline constexpr const char* loopLevel      = "loop_level";
+inline constexpr const char* loopMix        = "loop_mix";
 inline constexpr const char* loopScrub      = "loop_scrub";
 inline constexpr const char* loopQuantize   = "loop_quantize";
 inline constexpr const char* loopLength     = "loop_length";
