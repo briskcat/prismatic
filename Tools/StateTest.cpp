@@ -122,5 +122,79 @@ int main()
         std::printf("Loop Mix blends input and loop, and glides: %s\n", pass ? "PASS" : "FAIL");
         ok = ok && pass;
     }
+    // Reverb (Stray's Space plate), through the chain with every other block off.
+    {
+        auto fx = std::make_unique<prism::FxChain>();
+        fx->Init(48000.f);
+        prism::FxParams p;
+        p.filter_on = p.drive_on = p.tape_on = p.delay_on = false;
+        p.reverb_on = true;
+        p.reverb_mix = .5f;
+        p.reverb_decay = .5f;
+        fx->SetParams(p);
+        fx->Snap();
+        juce::Random rng(7);
+        auto noise = [&] { return .3f * (rng.nextFloat() * 2.f - 1.f); };
+        auto rms = [&](long len, bool feed, float* peak = nullptr) {
+            double e = 0;
+            for(long k = 0; k < len; ++k)
+            {
+                float l = feed ? noise() : 0.f, r = feed ? noise() : 0.f;
+                fx->Process(&l, &r, 1);
+                if(!std::isfinite(l)) return 1e9;
+                e += .5 * (l * l + r * r);
+                if(peak) *peak = std::max(*peak, std::max(std::fabs(l), std::fabs(r)));
+            }
+            return std::sqrt(e / len);
+        };
+        const double inRms = .3 / std::sqrt(3.0);
+        rms(48000, true);
+        const double half = rms(96000, true) / inRms;
+        p.reverb_mix = 1.f; fx->SetParams(p);
+        rms(48000, true);
+        const double full = rms(96000, true) / inRms;
+        // Full decay for 10 s of noise: must stay bounded.
+        p.reverb_decay = 1.f; fx->SetParams(p);
+        float peak = 0.f;
+        rms(480000, true, &peak);
+        // Freeze holds the tail; without it a medium decay dies away.
+        p.reverb_decay = .5f; p.reverb_freeze = true; fx->SetParams(p);
+        rms(4800, true);
+        const double frozen0 = rms(24000, false), frozen4 = (rms(168000, false), rms(24000, false));
+        p.reverb_freeze = false; fx->SetParams(p);
+        rms(48000, true);
+        const double free0 = rms(24000, false), free4 = (rms(168000, false), rms(24000, false));
+        // Mix and Decay jumped end to end with a 220 Hz tone in: biggest one-sample
+        // step, four tries at different points of the wave. The tone itself moves
+        // at most .009 a sample.
+        float jump = 0.f;
+        long  n = 0;
+        auto tone = [&] { return .3f * (float)std::sin(2.0 * juce::MathConstants<double>::pi * 220.0 * (n++) / 48000.0); };
+        for(long offset : {0L, 27L, 54L, 81L})
+            for(int which = 0; which < 2; ++which)
+            {
+                p.reverb_mix = which == 0 ? 0.f : 1.f; p.reverb_decay = 0.f; fx->SetParams(p);
+                float prev = 0.f;
+                for(long k = 0; k < 24000 + offset; ++k) { float l = tone(), r = l; fx->Process(&l, &r, 1); prev = l; }
+                if(which == 0) p.reverb_mix = 1.f; else p.reverb_decay = 1.f;
+                fx->SetParams(p);
+                float last = 0.f;
+                for(long k = 0; k < 4800; ++k)
+                {
+                    float l = tone(), r = l;
+                    fx->Process(&l, &r, 1);
+                    // compare against the tone's own step so only the knob's jump counts
+                    jump = std::max(jump, std::fabs((l - prev) - last));
+                    last = l - prev;
+                    prev = l;
+                }
+            }
+        std::printf("reverb: level vs dry at mix .5 %.2f, mix 1 %.2f; peak at full decay %.2f; frozen tail %.3f -> %.3f; free tail %.3f -> %.4f; biggest knob step %.4f\n",
+                    half, full, peak, frozen0, frozen4, free0, free4, jump);
+        const bool pass = half > .6 && half < 1.4 && full > .4 && full < 1.4 && peak < 1.2f
+                       && frozen4 > .7 * frozen0 && frozen0 > .02 && free4 < .02 * free0 && jump < .02f;
+        std::printf("Reverb level, freeze and knob glide: %s\n", pass ? "PASS" : "FAIL");
+        ok = ok && pass;
+    }
     return ok ? 0 : 1;
 }

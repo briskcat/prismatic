@@ -8,7 +8,8 @@ licenses. Their notices must be kept in any copy or redistribution.
 |---|---|---|---|
 | CHOMPI firmware (TAPE, TEMPO): the effects and looper this plug-in is ported from | © 2026 CHOMPI Club | MIT | `Source/dsp/` |
 | DaisySP (DSP the firmware is built on) | © 2020 Electrosmith, Corp. | MIT | `Source/dsp/` |
-| Mutable Instruments plate reverb, fx engine and limiter | © 2014 Emilie Gillet | MIT | `Source/dsp/Reverb.h` (full notice in the file), `Source/dsp/Squash.h` |
+| Mutable Instruments limiter | © 2014 Emilie Gillet | MIT | `Source/dsp/Squash.h` |
+| Space plate reverb: an original implementation of Jon Dattorro's plate ("Effect Design, Part 1", JAES 1997), from Stray | Prismatic | AGPLv3 (this project) | `Source/dsp/Plate.h` |
 | JUCE | © Raw Material Software | AGPLv3 (or JUCE licence) | downloaded at build time |
 | Instrument Serif | © The Instrument Serif Project Authors | SIL Open Font License 1.1 | `Assets/fonts/` (with `OFL-InstrumentSerif.txt`) |
 | DM Mono | © The DM Mono Project Authors | SIL Open Font License 1.1 | `Assets/fonts/` (with `OFL-DMMono.txt`) |

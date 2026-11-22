@@ -38,7 +38,7 @@ signs the plug-ins ad hoc, and writes `dist/Prism-FX-macOS.zip`.
 | Crush | Sample rate, Bits, Mix | new |
 | Delay | Time (ms or synced division), Feedback, Mix, Varispeed | TAPE `DSPEngine.h` |
 | Glitch Delay | see below | TEMPO `granularDelay.h` |
-| Reverb | Mix, Decay, Tone, Diffusion, Freeze | TAPE/TEMPO `reverb.h` (Mutable Instruments) |
+| Reverb | Mix, Decay, Tone, Diffusion, Freeze | Stray's Space plate (Dattorro), freeze from TEMPO |
 | Tape Looper | see below | TAPE `Sampler.h`, `LooperEngine.h` |
 | Squash | Squash (output compressor/limiter) | TAPE `limiter.h` |
 
@@ -264,10 +264,15 @@ cmake -B build -DPRISM_SNAPSHOT=ON && cmake --build build --target PrismSnapshot
 - The DSP in `Source/dsp/` is plain C++ with no JUCE or Daisy dependencies.
 - The firmware runs at a fixed 48 kHz. Smoothing coefficients, delay lengths and
   filter coefficients are rescaled for the host rate (`RateScale` in `DspUtil.h`).
-- The reverb's delay lengths are fixed at compile time, so at 88.2 kHz and above
-  the reverb runs at half or quarter rate to keep its sound.
-- The tape delay and reverb keep the firmware's 16-bit storage and clamping,
-  which are part of their sound.
+- The reverb is the Space plate from Stray (`Plate.h`), a Dattorro plate whose
+  lengths scale with the host rate. It replaced the firmware's Mutable
+  Instruments plate in 0.1.2. Mix is Stray's Space blend: dry and plate trade
+  places at equal loudness, and the plate sits a little under the dry level
+  at full Mix. Tone and Diffusion are fixed in Stray; their defaults here
+  (.6 and .7) match it. Freeze fades the input out and stops the tank losing
+  level, so the tail holds (it softens slowly, about 2–3 dB over 4 s).
+- The tape delay keeps the firmware's 16-bit storage and clamping, which are
+  part of its sound.
 
 ## Name
 

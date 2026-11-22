@@ -17,7 +17,7 @@
 #include "Crusher.h"
 #include "DjFilter.h"
 #include "GlitchDelay.h"
-#include "Reverb.h"
+#include "Plate.h"
 #include "Squash.h"
 #include "TapeDelay.h"
 #include "TapeLooper.h"
@@ -177,20 +177,21 @@ class FxChain
 
         if(p.classic)
         {
-            // TAPE: one reverb knob sets amount, tone and diffusion;
-            // the delay time knob also sets the reverb decay.
+            // TAPE: one reverb knob sets amount, tone and diffusion (more
+            // reverb is brighter and denser); the delay time knob also sets
+            // the reverb decay.
             const float amt         = 1.3f * std::log(p.reverb_mix + 1.f);
-            rev_amount_target_      = amt * amt * .8f;
-            rev_tone_target_        = amt * .6f + .4f;
-            rev_diffusion_target_   = amt * .6f;
+            rev_amount_target_      = amt * .85f;
+            rev_tone_target_        = .3f + .5f * amt;
+            rev_diffusion_target_   = .4f + .4f * amt;
             rev_time_target_        = fclamp(p.delay_time_norm, .05f, .97f);
         }
         else
         {
             rev_amount_target_    = p.reverb_mix;
-            rev_tone_target_      = .4f + .6f * p.reverb_tone;
-            rev_diffusion_target_ = .75f * p.reverb_diffusion;
-            rev_time_target_      = .05f + .92f * p.reverb_decay;
+            rev_tone_target_      = p.reverb_tone;
+            rev_diffusion_target_ = p.reverb_diffusion;
+            rev_time_target_      = p.reverb_decay;
         }
         reverb_.SetFreeze(p.reverb_freeze);
 
@@ -285,9 +286,9 @@ class FxChain
                 glitch_.Process(&x_l, &x_r);
                 break;
             case Block::Reverb:
-                reverb_.SetAmount(rev_amount_);
-                reverb_.SetTime(rev_time_);
-                reverb_.SetLowpass(rev_tone_);
+                reverb_.SetMix(rev_amount_);
+                reverb_.SetDecay(rev_time_);
+                reverb_.SetTone(rev_tone_);
                 reverb_.SetDiffusion(rev_diffusion_);
                 Section(kReverb, x_l, x_r, [&](float& a, float& c) { reverb_.Process(&a, &c); });
                 break;
@@ -338,7 +339,7 @@ class FxChain
     Crusher     crusher_;
     TapeDelay   delay_;
     GlitchDelay glitch_;
-    Reverb      reverb_;
+    Plate       reverb_;
     Squash      squash_;
     TapeLooper  looper_;
 
