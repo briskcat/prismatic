@@ -770,10 +770,10 @@ void Module::PollSketch()
 
 void Module::NewLine(int height) { lineH_.push_back(height); }
 
-void Module::AddKnob(juce::Component& c)
+void Module::AddKnob(juce::Component& c, int width)
 {
     addAndMakeVisible(c);
-    items_.push_back({Item::Knob, &c, kCell, (int)lineH_.size() - 1});
+    items_.push_back({Item::Knob, &c, width > 0 ? width : kCell, (int)lineH_.size() - 1});
 }
 
 void Module::AddFixed(juce::Component& c, int width)
@@ -1874,11 +1874,14 @@ PrismEditor::PrismEditor(PrismProcessor& p) : AudioProcessorEditor(&p), proc_(p)
     looper_->NewLine(92);
     // position and length are set on the waveform; they are still parameters for automation
     swaps_.push_back(&keep(std::make_unique<SwapKnob>(s, ids::loopSpeedSteps, ids::loopSpeed, ids::loopSpeedStep, "Speed")));
-    looper_->AddKnob(*swaps_.back());
-    looper_->AddKnob(knob(ids::loopGlide, "Glide"));
-    looper_->AddKnob(knob(ids::loopDub, "Dub keep"));
-    looper_->AddKnob(knob(ids::loopLevel, "Level"));
-    looper_->AddKnob(knob(ids::loopWander, "Wander"));
+    // six knobs in a slightly tighter row (60 px each), so the looper still fits beside the glitch delay
+    constexpr int kLoopCell = 60;
+    looper_->AddKnob(*swaps_.back(), kLoopCell);
+    looper_->AddKnob(knob(ids::loopGlide, "Glide"), kLoopCell);
+    looper_->AddKnob(knob(ids::loopDub, "Dub keep"), kLoopCell);
+    looper_->AddKnob(knob(ids::loopLevel, "Level"), kLoopCell);
+    looper_->AddKnob(knob(ids::loopMix, "Mix"), kLoopCell);
+    looper_->AddKnob(knob(ids::loopWander, "Wander"), kLoopCell);
     {
         std::vector<juce::Component*> combos;
         for(auto [id, label] : {std::pair{ids::loopSnap, "Snap"}, std::pair{ids::loopLength, "Rec length"},

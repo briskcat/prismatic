@@ -139,6 +139,15 @@ The loop behaves like a tape loop:
 - **Overdubs** are written at the tape's current speed, so a part overdubbed at
   half speed plays back an octave up at normal speed.
 - **Dub Keep** sets how much of the existing loop survives each overdub pass.
+- **Level** sets how loud the loop plays. **Mix** blends the loop against
+  what's coming in, like the blend knob on a looper pedal. At noon (the
+  default) both play at full, the same as before Mix existed. Turn it left and
+  the loop fades out until only the input is left. Turn it right and the input
+  fades out until only the loop plays, so you can hear a loop on its own while
+  the track it came from keeps running. The input only fades while there's a
+  loop to hear instead: on an empty looper, and while recording the first take,
+  you always hear what's coming in. After CLEAR it comes back up as the loop
+  fades out. Mix glides over about 20 ms, so turning it never clicks.
 - **Scrub**: while stopped, click or drag the waveform to move the tape.
 - **Position / Length** set which part of the tape loops. Playback and
   overdubs stay inside that window, and the audio outside it is kept.
@@ -174,10 +183,15 @@ The loop behaves like a tape loop:
 
 | Button | Does |
 |---|---|
-| REC | Empty: start recording. Recording: close the loop and keep overdubbing. Playing: overdub on/off. |
+| REC | Empty: start recording. Recording: close the loop and play it back. Playing: overdub on/off. Stopped: play and overdub. |
 | PLAY | Recording: close the loop and play. Playing: stop. Stopped: play. |
 | CLEAR | Erase the loop. |
 
+- Closing a recording with REC plays the loop back without overdubbing, so
+  nothing new lands on it by accident. Press REC again to start an overdub.
+  (The CHOMPI hardware goes straight into overdub here; Prism FX changed this
+  in 0.1.1.) PLAY closes it the same way, and so does Length when it stops the
+  first take.
 - **Quantize** (Beat / Bar) holds a button press until the next beat or bar.
   The REC button blinks while a press is waiting.
 - **Length** (1 to 8 bars) stops the first recording automatically at exactly

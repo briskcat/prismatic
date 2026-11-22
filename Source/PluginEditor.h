@@ -150,7 +150,8 @@ class Module : public juce::Component
 
     /** Start a line of controls. height 0 = share what's left. */
     void NewLine(int height);
-    void AddKnob(juce::Component&);
+    /** width: the knob's cell (0 = the usual 72 px) */
+    void AddKnob(juce::Component&, int width = 0);
     void AddFixed(juce::Component&, int width);
     void AddFlexible(juce::Component&, int minWidth);
 

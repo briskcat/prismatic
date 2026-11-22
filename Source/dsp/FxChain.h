@@ -59,7 +59,7 @@ struct FxParams
     bool  squash_on = false;
     float squash = 0.f;
 
-    float looper_speed = 1.f, looper_glide = .2f, looper_dub = 1.f, looper_level = 1.f, looper_scrub = 0.f;
+    float looper_speed = 1.f, looper_glide = .2f, looper_dub = 1.f, looper_level = 1.f, looper_mix = .5f, looper_scrub = 0.f;
     bool  looper_reverse = false;
 };
 
@@ -201,6 +201,7 @@ class FxChain
         looper_.SetGlide(p.looper_glide);
         looper_.SetDub(p.looper_dub);
         looper_.SetLevel(p.looper_level);
+        looper_.SetMix(p.looper_mix);
         looper_.SetScrub(p.looper_scrub);
     }
 

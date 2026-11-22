@@ -18,8 +18,13 @@
 //   (drift, random or scan), seeded so the same seed takes the same path.
 //
 // Buttons follow the hardware:
-//   REC   empty -> record; recording -> close the loop and keep overdubbing;
-//         playing -> overdub on/off
+//   REC   empty -> record; recording -> close the loop and play (the
+//         hardware goes straight into overdub; here a second REC press
+//         starts it); playing -> overdub on/off
+//
+// Mix blends what passes through against the loop: at noon both are at full
+// level, left fades the loop out, right fades the input out so only the loop
+// plays. The input only fades once there's a loop to hear instead.
 //   PLAY  recording -> close the loop and play; playing -> stop; stopped -> play
 //   CLEAR erase the loop
 
@@ -78,8 +83,8 @@ class TapeLooper
                 break;
             case State::Recording:
                 CloseLoop();
-                state_  = State::Playing;
-                dubbing_ = true;
+                state_   = State::Playing;
+                dubbing_ = false;
                 break;
             case State::Playing: dubbing_ = !dubbing_; break;
             case State::Stopped:
@@ -122,6 +127,8 @@ class TapeLooper
     void SetGlide(float g) { glide_coef_ = rate_.Coef(.01f * std::pow(.005f, fclamp(g, 0.f, 1.f))); }
     void SetDub(float d) { dub_target_ = fclamp(d, 0.f, 1.f); }
     void SetLevel(float l) { level_target_ = l; }
+    /** 0 = input only, .5 = both at full, 1 = loop only */
+    void SetMix(float m) { mix_target_ = fclamp(m, 0.f, 1.f); }
     /** The part of the tape to loop, in samples: where it starts and how long it is. It may wrap. */
     void SetWindow(size_t start, size_t length)
     {
@@ -199,6 +206,15 @@ class TapeLooper
         const float in_l = *l, in_r = *r;
         fonepole(dub_, dub_target_, dub_coef_);
         fonepole(level_, level_target_, level_coef_);
+        fonepole(mix_, mix_target_, level_coef_);
+        // Mix: the input fades only while there's a loop to hear instead, and
+        // comes back up as CLEAR fades the loop out. Both gains glide (~20 ms).
+        const bool  has_loop = len_ > 0 && (state_ == State::Playing || state_ == State::Stopped);
+        const float dry_full = std::fmin(1.f, 2.f * (1.f - mix_));
+        fonepole(dry_, has_loop ? 1.f - (1.f - dry_full) * clear_env_ : 1.f, level_coef_);
+        const float wet = std::fmin(1.f, 2.f * mix_);
+        *l = in_l * dry_;
+        *r = in_r * dry_;
 
         if(state_ == State::Recording)
         {
@@ -208,7 +224,7 @@ class TapeLooper
             {
                 CloseLoop();
                 state_   = State::Playing;
-                dubbing_ = true;
+                dubbing_ = false;
             }
             prev_in_l_ = in_l;
             prev_in_r_ = in_r;
@@ -302,8 +318,8 @@ class TapeLooper
         prev_in_l_ = in_l;
         prev_in_r_ = in_r;
 
-        *l = in_l + out_l;
-        *r = in_r + out_r;
+        *l = in_l * dry_ + out_l * wet;
+        *r = in_r * dry_ + out_r * wet;
     }
 
   public:
@@ -548,6 +564,7 @@ class TapeLooper
     bool  reverse_ = false;
     float dub_ = 1.f, dub_target_ = 1.f, dub_coef_ = .0001f;
     float level_ = 1.f, level_target_ = 1.f, level_coef_ = .001f;
+    float mix_ = .5f, mix_target_ = .5f, dry_ = 1.f;
     float input_env_ = 0.f, input_step_ = .001f;
     float prev_in_l_ = 0.f, prev_in_r_ = 0.f;
     float seam_fade_ = 96.f;

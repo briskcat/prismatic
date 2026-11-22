@@ -162,6 +162,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CreateParameterLayout()
     layout.add(Knob(ids::loopGlide, "Loop Glide", .2f));
     layout.add(Knob(ids::loopDub, "Loop Dub Keep", 1.f));
     layout.add(Knob(ids::loopLevel, "Loop Level", 1.f));
+    layout.add(Knob(ids::loopMix, "Loop Mix", .5f));
     layout.add(Knob(ids::loopScrub, "Loop Scrub", 0.f));
     layout.add(std::make_unique<APC>(Id(ids::loopQuantize), "Loop Quantize", juce::StringArray{"Off", "Beat", "Bar"}, 0));
     layout.add(std::make_unique<APC>(Id(ids::loopLength), "Loop Length",
